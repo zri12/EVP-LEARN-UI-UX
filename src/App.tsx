@@ -579,33 +579,29 @@ function HomePage() {
         <p className="eyebrow">ENGLISH FOR VOCATIONAL PURPOSES</p>
         <h1>{t.readyToLearn}</h1>
         <p>{returning ? t.continueLearning + "." : t.startJourney}</p>
-        <div className="hero-objects">
-          <div className="shelf"><i /><i /><i /></div>
-          <img className="hero-logo" src={logo} alt="EVP Learn" />
-        </div>
       </section>
 
-      {returning && m ? (
-        <section className="continue-card" onClick={() => nav(mRoute)}>
-          <span>{t.continueLearning.toUpperCase()}</span>
-          <div><b>Module 0{activeId} · {m.title}</b><p>{mSection || `Reading · ${m.reading}`}</p></div>
-          <ProgressBar value={mProgress} color={m.accent} />
-          <footer><small>{t.percentComplete(mProgress)}</small><ArrowRight size={19} /></footer>
+      <div className="home-overlap">
+
+        {returning && m ? (
+          <section className="continue-card premium" onClick={() => nav(mRoute)}>
+            <span>{t.continueLearning.toUpperCase()}</span>
+            <div><b>Module 0{activeId} · {m.title}</b><p>{mSection || `Reading · ${m.reading}`}</p></div>
+            <ProgressBar value={mProgress} color={m.accent} />
+            <footer><small>{t.percentComplete(mProgress)}</small><ArrowRight size={19} /></footer>
+          </section>
+        ) : null}
+
+        <section className="home-section-title">
+          <div><h2>{t.learningProgress}</h2><p>{returning ? "" : t.noProgressYet}</p></div>
+          <b style={{ color: '#2563eb', fontSize: 13, fontWeight: 700 }}>{t.modulesCompletedOf(completedCount)}</b>
         </section>
-      ) : !returning ? (
-        <Button onClick={() => nav("/modules")}>{t.exploreModules} <ArrowRight size={18} /></Button>
-      ) : null}
+        <div style={{ padding: '0 20px' }}><ProgressBar value={overallPct} /></div>
 
-      <section className="section-head">
-        <div><h2>{t.learningProgress}</h2><p>{returning ? "" : t.noProgressYet}</p></div>
-        <b>{t.modulesCompletedOf(completedCount)}</b>
-      </section>
-      <ProgressBar value={overallPct} />
-
-      <section className="section-head" style={{ marginTop: 28 }}>
-        <h2>{t.yourModules}</h2>
-        <button className="text-link" onClick={() => nav("/modules")}>{t.seeAll}</button>
-      </section>
+        <section className="home-section-title" style={{ marginTop: 32 }}>
+          <h2>{t.yourModules}</h2>
+          <button className="text-link" onClick={() => nav("/modules")}>{t.seeAll}</button>
+        </section>
       <div className="module-slider">
         {modules.map(mod => {
           const prog = mods[mod.id]?.pct ?? 0;
@@ -613,12 +609,19 @@ function HomePage() {
         })}
       </div>
 
-      <section className="section-head" style={{ marginTop: 28 }}>
-        <h2>{t.quickAccess}</h2>
-      </section>
-      <div className="quick-grid-2">
-        <Quick2 icon={CircleHelp} label={t.howToUse} onClick={() => nav("/guide")} />
-        <Quick2 icon={Target} label={t.learningOutcomes} onClick={() => nav("/outcomes")} />
+        <section className="home-section-title" style={{ marginTop: 12 }}>
+          <h2>{t.quickAccess}</h2>
+        </section>
+        <div className="bento-grid" style={{ padding: '0 20px 32px' }}>
+          <button className="bento-card" onClick={() => nav("/guide")}>
+            <div className="bento-icon"><CircleHelp size={22} color="#3b82f6" /></div>
+            <span>{t.howToUse}</span>
+          </button>
+          <button className="bento-card" onClick={() => nav("/outcomes")}>
+            <div className="bento-icon"><Target size={22} color="#3b82f6" /></div>
+            <span>{t.learningOutcomes}</span>
+          </button>
+        </div>
       </div>
     </Shell>
   );
@@ -634,23 +637,20 @@ function Quick2({ icon: I, label, onClick }: { icon: React.ElementType; label: s
 }
 
 function SliderCard({ m, onClick, progress, t }: { m: ModuleUI; onClick: () => void; progress: number; t: typeof T.id }) {
-  const I = m.icon;
   return (
-    <button className="slider-card" onClick={onClick}>
-      <div className="slider-card-top">
-        <div className="slider-card-icon" style={{ background: m.tint, color: m.accent }}>
-          <I size={24} />
-        </div>
-        {progress > 0 && <span className="slider-card-progress">{progress}%</span>}
+    <button className="premium-card" onClick={onClick}>
+      <div className="premium-card-image" style={{ background: m.tint }}>
+        <img src={m.art} alt={m.title} />
+        {progress > 0 && <span className="premium-card-badge">{progress}%</span>}
       </div>
-      <div>
+      <div className="premium-card-content">
         <h3>Module 0{m.id}</h3>
         <p>{m.title}</p>
-      </div>
-      <div className="slider-card-footer">
-        <span>{t.exploreModules}</span>
-        <div className="play-btn">
-          <Play size={16} fill="currentColor" style={{ marginLeft: 2 }} />
+        <div className="slider-card-footer">
+          <span>{t.exploreModules}</span>
+          <div className="play-btn">
+            <Play size={14} fill="currentColor" style={{ marginLeft: 2 }} />
+          </div>
         </div>
       </div>
     </button>
