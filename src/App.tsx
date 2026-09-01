@@ -76,7 +76,7 @@ const AUDIO_MANIFEST = {
     "/audio/glossary/crisis.wav", "/audio/glossary/delivery.wav",
     "/audio/glossary/display.wav", "/audio/glossary/dual-screen-display.wav",
     "/audio/glossary/durable.wav", "/audio/glossary/eye-catching.wav",
-    "/audio/glossary/finish.wav", "/audio/glossary/flat-pack.wav",
+    "/audio/glossary/finish.wav", "/audio/glossary/flat-packing.wav",
     "/audio/glossary/genuine.wav", "/audio/glossary/gondola-shelving.wav",
     "/audio/glossary/greet.wav", "/audio/glossary/innovation.wav",
     "/audio/glossary/insert.wav", "/audio/glossary/integrated.wav",
