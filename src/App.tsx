@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createBrowserRouter, RouterProvider, useNavigate, useLocation } from "react-router";
 import {
   BookOpen, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CircleHelp, ClipboardCheck,
@@ -8,7 +8,7 @@ import {
   BarChart2,
 } from "lucide-react";
 import ReadingIllustration from "./illustrations";
-import { MODULES, glossaryFor } from "./data";
+import { MODULES, PASSING_THRESHOLD, readingGlossaryFor, type Reading, type Word } from "./data";
 import logo from "./imports/LOGO.png";
 import module1Art from "./imports/module-art/module-1-narrative.png";
 import module2Art from "./imports/module-art/module-2-descriptive.png";
@@ -17,9 +17,105 @@ import narrativeLessonArt from "./imports/lesson-art/narrative-lesson.png";
 import descriptiveLessonArt from "./imports/lesson-art/descriptive-lesson.png";
 import procedureLessonArt from "./imports/lesson-art/procedure-lesson.png";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── UI Types ─────────────────────────────────────────────────────────────────
 type Lang = "id" | "en";
-type Module = { id: number; title: string; subtitle: string; accent: string; tint: string; icon: typeof BookOpen; reading: string; art: string };
+type ModuleUI = { id: number; title: string; subtitle: string; accent: string; tint: string; icon: typeof BookOpen; reading: string; art: string };
+
+// ─── Scoring / Persistence Types ──────────────────────────────────────────────
+type ActivityResult = { score: number; correct: number; total: number; completed: boolean };
+type PretestData = { score: number; correct: number; incorrect: number };
+type PosttestData = { raw: number; weighted: number; correct: number; incorrect: number };
+type ModuleAttempt = {
+  id: string; timestamp: string;
+  pretestScore: number; practiceScore: number;
+  posttestRaw: number; posttestWeighted: number;
+  finalScore: number; learningGain: number; passed: boolean;
+};
+type ModState = {
+  pct: number; section: string; lastRoute: string;
+  pretestResult?: PretestData;
+  practiceActivities: ActivityResult[];
+  practiceScore: number;
+  posttestResult?: PosttestData;
+  finalScore?: number; passed?: boolean;
+  attempts: ModuleAttempt[];
+  latestScore?: number; bestScore?: number;
+};
+type GState = { version: 2; lastModule?: number; lastRoute?: string; mods: { [key: string]: ModState } };
+type GCtxType = {
+  gs: GState;
+  updateModPct: (id: number, pct: number, section: string, route: string) => void;
+  savePretestResult: (id: number, r: PretestData) => void;
+  savePracticeActivity: (id: number, idx: number, r: ActivityResult) => void;
+  finalizePosttest: (id: number, r: PosttestData) => void;
+  retryModule: (id: number) => void;
+};
+
+// ─── Audio Manifest (only real existing files) ────────────────────────────────
+const AUDIO_MANIFEST = {
+  reading: new Set<string>([
+    "/audio/reading/m1-1.wav",
+    "/audio/reading/m2-1.wav", "/audio/reading/m2-2.wav", "/audio/reading/m2-3.wav",
+    "/audio/reading/m3-1.wav",
+  ]),
+  vocabulary: new Set<string>([
+    "/audio/vocabulary/m1-1.wav", "/audio/vocabulary/m1-2.wav", "/audio/vocabulary/m1-3.wav",
+    "/audio/vocabulary/m1-4.wav", "/audio/vocabulary/m1-5.wav",
+    "/audio/vocabulary/m2-1.wav", "/audio/vocabulary/m2-2.wav", "/audio/vocabulary/m2-3.wav",
+    "/audio/vocabulary/m2-4.wav", "/audio/vocabulary/m2-5.wav",
+    "/audio/vocabulary/m3-1.wav", "/audio/vocabulary/m3-2.wav", "/audio/vocabulary/m3-3.wav",
+    "/audio/vocabulary/m3-4.wav", "/audio/vocabulary/m3-5.wav",
+  ]),
+  glossary: new Set<string>([
+    "/audio/glossary/adjustable.wav", "/audio/glossary/affordable.wav",
+    "/audio/glossary/assemble.wav", "/audio/glossary/asymmetrical.wav",
+    "/audio/glossary/attach.wav", "/audio/glossary/boycott.wav",
+    "/audio/glossary/cash-drawer.wav", "/audio/glossary/casing.wav",
+    "/audio/glossary/centerpiece.wav", "/audio/glossary/checkout.wav",
+    "/audio/glossary/crisis.wav", "/audio/glossary/delivery.wav",
+    "/audio/glossary/display.wav", "/audio/glossary/dual-screen-display.wav",
+    "/audio/glossary/durable.wav", "/audio/glossary/eye-catching.wav",
+    "/audio/glossary/finish.wav", "/audio/glossary/flat-pack.wav",
+    "/audio/glossary/genuine.wav", "/audio/glossary/gondola-shelving.wav",
+    "/audio/glossary/greet.wav", "/audio/glossary/innovation.wav",
+    "/audio/glossary/insert.wav", "/audio/glossary/integrated.wav",
+    "/audio/glossary/merchandise.wav", "/audio/glossary/open-front.wav",
+    "/audio/glossary/payment-method.wav", "/audio/glossary/receipt.wav",
+    "/audio/glossary/retailer.wav", "/audio/glossary/scan.wav",
+    "/audio/glossary/sleek.wav", "/audio/glossary/sturdy.wav",
+    "/audio/glossary/supplier.wav", "/audio/glossary/suppliers.wav",
+    "/audio/glossary/verify.wav", "/audio/glossary/visibility.wav",
+    // Missing (no audio file): enter.wav, change.wav, hand-over.wav
+  ]),
+};
+
+function hasAudio(type: keyof typeof AUDIO_MANIFEST, path: string): boolean {
+  return AUDIO_MANIFEST[type].has(path);
+}
+
+// ─── Score Calculator ─────────────────────────────────────────────────────────
+function calculateQuizScore(
+  questions: { answer: number }[],
+  answers: (number | undefined)[]
+): { answered: number; total: number; correct: number; incorrect: number; percentage: number } {
+  const total = questions.length;
+  let correct = 0;
+  let answered = 0;
+  for (let i = 0; i < total; i++) {
+    const a = answers[i];
+    if (typeof a === "number" && Number.isInteger(a)) {
+      answered++;
+      if (a === questions[i].answer) correct++;
+    }
+  }
+  return {
+    answered,
+    total,
+    correct,
+    incorrect: answered - correct,
+    percentage: total > 0 ? Math.round((correct / total) * 100) : 0,
+  };
+}
 
 // ─── Translations ─────────────────────────────────────────────────────────────
 const T = {
@@ -44,6 +140,7 @@ const T = {
     backToModules: "Kembali ke Beranda",
     greatJob: "Bagus!", thatCorrect: "Jawabanmu benar.",
     notQuiteYet: "Belum tepat", reviewSentence: "Coba pelajari kembali materinya.",
+    partialCredit: "Sebagian benar!",
     continueBtn: "Lanjut",
     yourProgress: "Progres Belajarmu", noProgressYet: "Perjalanan belajarmu dimulai di sini.",
     startLearning: "Mulai Belajar",
@@ -78,35 +175,27 @@ const T = {
     afterModule: "Setelah menyelesaikan modul ini, kamu akan mampu:",
     aboutModuleDesc: "Pelajari cara kerja teks dalam konteks retail melalui bacaan terfokus, kosakata, audio, dan latihan interaktif.",
     activityOf: (n: number, tot: number) => `Aktivitas ${n} dari ${tot}`,
-    localAudio: "Audio lokal", audioUnavailable: "Audio saat ini belum tersedia",
+    localAudio: "Audio lokal", audioUnavailable: "Audio belum tersedia",
     playPronunciation: "Dengarkan pengucapan", playingPronunciation: "Memutar pengucapan...",
     answersReady: (n: number, tot: number) => `${n} dari ${tot} jawaban siap dikirim.`,
     correctCount: (c: number, w: number) => `${c} benar · ${w} salah`,
     percentComplete: (p: number) => `${p}% selesai`,
-    practiceActivityTitles: ["Mencocokkan Struktur", "Mencocokkan Kosakata", "Mengurutkan Peristiwa"],
-    practiceInstructions: [
-      "Pilih bagian teks yang memperkenalkan tokoh dan latar cerita.",
-      "Pilih kata yang tepat untuk definisi: 'kemasan padat siap dirakit sendiri'.",
-      "Ketuk untuk mengurutkan peristiwa-peristiwa ini secara benar.",
-    ],
     wordType: "Jenis kata",
     posttestIntro: "Post-test",
     pretestIntroTitle: "Pre-test Diagnostik",
     stepLearn: "Belajar", stepPractice: "Latihan",
+    stepOf: (n: number, tot: number) => `Langkah ${n} dari ${tot}`,
     questionsLabel: "soal", multipleChoice: "Pilihan Ganda",
-    structureMatch: "Mencocokkan Struktur", vocabMatch: "Mencocokkan Kosakata", eventSeq: "Mengurutkan Peristiwa",
     subMaterialOf: (n: number, tot: number) => `Teks ${n} dari ${tot}`,
     nextText: "Teks Berikutnya", finishReading: "Selesai Membaca",
     glossaryLabel: "Glosarium",
+    sequenceHelp: "Gunakan tombol panah untuk memindahkan setiap item ke atas atau ke bawah.",
+    moveUp: (x: string) => `Pindahkan ${x} ke atas`,
+    moveDown: (x: string) => `Pindahkan ${x} ke bawah`,
     profileFields: {
-      nama: "Nama Lengkap",
-      nim: "NIM",
-      prodi: "Program Studi",
-      fakultas: "Fakultas",
-      universitas: "Universitas",
-      pembimbing: "Dosen Pembimbing",
-      judul: "Judul Penelitian",
-      tahun: "Tahun",
+      nama: "Nama Lengkap", nim: "NIM", prodi: "Program Studi",
+      fakultas: "Fakultas", universitas: "Universitas",
+      pembimbing: "Dosen Pembimbing", judul: "Judul Penelitian", tahun: "Tahun",
     },
   },
   en: {
@@ -130,6 +219,7 @@ const T = {
     backToModules: "Back to Home",
     greatJob: "Great job!", thatCorrect: "That's correct.",
     notQuiteYet: "Not quite yet", reviewSentence: "Review the material and try once more.",
+    partialCredit: "Partially correct!",
     continueBtn: "Continue",
     yourProgress: "Your Learning Progress", noProgressYet: "Your learning journey starts here.",
     startLearning: "Start Learning",
@@ -164,54 +254,170 @@ const T = {
     afterModule: "After completing this module, you will be able to:",
     aboutModuleDesc: "Learn how texts work in retail contexts through focused reading, vocabulary, audio, and practice activities.",
     activityOf: (n: number, tot: number) => `Activity ${n} of ${tot}`,
-    localAudio: "Local audio", audioUnavailable: "Audio is currently unavailable",
+    localAudio: "Local audio", audioUnavailable: "Audio is not available yet",
     playPronunciation: "Listen to pronunciation", playingPronunciation: "Playing pronunciation...",
     answersReady: (n: number, tot: number) => `${n} of ${tot} answers are ready to submit.`,
     correctCount: (c: number, w: number) => `${c} correct · ${w} incorrect`,
     percentComplete: (p: number) => `${p}% complete`,
-    practiceActivityTitles: ["Structure Match", "Vocabulary Match", "Event Sequencing"],
-    practiceInstructions: [
-      "Choose the text part that introduces the characters and setting.",
-      "Select the right word for the definition: 'a compact package ready for self-assembly'.",
-      "Tap to arrange these events in the correct order.",
-    ],
     wordType: "Part of speech",
     posttestIntro: "Post-test",
     pretestIntroTitle: "Diagnostic Pre-test",
     stepLearn: "Learn", stepPractice: "Practice",
+    stepOf: (n: number, tot: number) => `Step ${n} of ${tot}`,
     questionsLabel: "questions", multipleChoice: "Multiple Choice",
-    structureMatch: "Structure Match", vocabMatch: "Vocabulary Match", eventSeq: "Event Sequencing",
     subMaterialOf: (n: number, tot: number) => `Text ${n} of ${tot}`,
     nextText: "Next Text", finishReading: "Finish Reading",
     glossaryLabel: "Glossary",
+    sequenceHelp: "Use the arrow buttons to move each item up or down.",
+    moveUp: (x: string) => `Move ${x} up`,
+    moveDown: (x: string) => `Move ${x} down`,
     profileFields: {
-      nama: "Full Name",
-      nim: "Student ID / NIM",
-      prodi: "Study Program",
-      fakultas: "Faculty",
-      universitas: "University",
-      pembimbing: "Supervisor",
-      judul: "Research Title",
-      tahun: "Year",
+      nama: "Full Name", nim: "Student ID / NIM", prodi: "Study Program",
+      fakultas: "Faculty", universitas: "University",
+      pembimbing: "Supervisor", judul: "Research Title", tahun: "Year",
     },
   },
 };
 
+// ─── Lang Context ─────────────────────────────────────────────────────────────
 const LangCtx = createContext<{ lang: Lang; setLang: (l: Lang) => void; t: typeof T.id }>({
   lang: "id", setLang: () => {}, t: T.id,
 });
 function useLang() { return useContext(LangCtx); }
-
 function LangProvider({ children }: { children: React.ReactNode }) {
   const [lang, setLangState] = useState<Lang>(() => (localStorage.getItem("evp-lang") as Lang) || "id");
   function setLang(l: Lang) { setLangState(l); localStorage.setItem("evp-lang", l); }
   return <LangCtx.Provider value={{ lang, setLang, t: T[lang] }}>{children}</LangCtx.Provider>;
 }
 
-// ─── Static content (English — not translated) ────────────────────────────────
+// ─── Global State ─────────────────────────────────────────────────────────────
+const GCtx = createContext<GCtxType | null>(null);
+function useGlobalState() {
+  const ctx = useContext(GCtx);
+  if (!ctx) throw new Error("useGlobalState outside StateProvider");
+  return ctx;
+}
+function defaultModState(): ModState {
+  return { pct: 0, section: "", lastRoute: "", practiceActivities: [], practiceScore: 0, attempts: [] };
+}
+function loadGState(): GState {
+  try {
+    const raw = localStorage.getItem("evp-state-v2");
+    if (raw) {
+      const p = JSON.parse(raw) as GState;
+      if (p?.version === 2 && p?.mods) {
+        for (const id of [1, 2, 3]) {
+          if (!p.mods[id]) p.mods[id] = defaultModState();
+          if (!Array.isArray(p.mods[id].practiceActivities)) p.mods[id].practiceActivities = [];
+          if (!Array.isArray(p.mods[id].attempts)) p.mods[id].attempts = [];
+          if (typeof p.mods[id].practiceScore !== "number") p.mods[id].practiceScore = 0;
+        }
+        return p;
+      }
+    }
+    // Migrate from v1
+    const base: GState = { version: 2, mods: { 1: defaultModState(), 2: defaultModState(), 3: defaultModState() } };
+    try {
+      const v1 = JSON.parse(localStorage.getItem("evp-progress") || "{}");
+      if (v1.m1) base.mods[1].pct = Number(v1.m1) || 0;
+      if (v1.m2) base.mods[2].pct = Number(v1.m2) || 0;
+      if (v1.m3) base.mods[3].pct = Number(v1.m3) || 0;
+      if (v1.lastModule) base.lastModule = v1.lastModule;
+      if (v1.lastRoute) base.lastRoute = v1.lastRoute;
+    } catch { /* ignore */ }
+    return base;
+  } catch {
+    return { version: 2, mods: { 1: defaultModState(), 2: defaultModState(), 3: defaultModState() } };
+  }
+}
+function saveGState(s: GState) {
+  try { localStorage.setItem("evp-state-v2", JSON.stringify(s)); } catch { /* ignore */ }
+}
+
+function StateProvider({ children }: { children: React.ReactNode }) {
+  const [gs, setGS] = useState<GState>(loadGState);
+  function persist(next: GState) { setGS(next); saveGState(next); }
+
+  function updateModPct(id: number, pct: number, section: string, route: string) {
+    const next = { ...gs, lastModule: id, lastRoute: route, mods: { ...gs.mods } };
+    next.mods[id] = { ...next.mods[id], pct: Math.max(next.mods[id]?.pct ?? 0, pct), section, lastRoute: route };
+    persist(next);
+  }
+
+  function savePretestResult(id: number, r: PretestData) {
+    const next = { ...gs, mods: { ...gs.mods } };
+    next.mods[id] = { ...next.mods[id], pretestResult: r };
+    persist(next);
+  }
+
+  function savePracticeActivity(id: number, idx: number, r: ActivityResult) {
+    const next = { ...gs, mods: { ...gs.mods } };
+    const mod = { ...next.mods[id] };
+    const acts = [...(mod.practiceActivities || [])];
+    acts[idx] = r;
+    mod.practiceActivities = acts;
+    mod.practiceScore = acts.reduce((sum, a) => sum + (a?.score ?? 0), 0);
+    next.mods[id] = mod;
+    persist(next);
+  }
+
+  function finalizePosttest(id: number, r: PosttestData) {
+    const next = { ...gs, mods: { ...gs.mods } };
+    const mod = { ...next.mods[id] };
+    mod.posttestResult = r;
+    const pracScore = mod.practiceScore || 0;
+    const finalScore = Math.round((r.weighted + pracScore) * 10) / 10;
+    const passed = finalScore >= PASSING_THRESHOLD;
+    mod.finalScore = finalScore;
+    mod.passed = passed;
+    const pretestScore = mod.pretestResult?.score ?? 0;
+    const attempt: ModuleAttempt = {
+      id: `${id}-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      pretestScore, practiceScore: pracScore,
+      posttestRaw: r.raw, posttestWeighted: r.weighted,
+      finalScore, learningGain: r.raw - pretestScore, passed,
+    };
+    mod.attempts = [...(mod.attempts || []), attempt];
+    mod.latestScore = finalScore;
+    mod.bestScore = Math.max(mod.bestScore ?? 0, finalScore);
+    mod.pct = 100;
+    next.mods[id] = mod;
+    persist(next);
+  }
+
+  function retryModule(id: number) {
+    const next = { ...gs, mods: { ...gs.mods } };
+    const mod = { ...next.mods[id] };
+    mod.pretestResult = undefined;
+    mod.practiceActivities = [];
+    mod.practiceScore = 0;
+    mod.posttestResult = undefined;
+    mod.finalScore = undefined;
+    mod.passed = undefined;
+    mod.pct = 10;
+    mod.section = "";
+    mod.lastRoute = `/module/${id}/objectives`;
+    next.mods[id] = mod;
+    next.lastRoute = `/module/${id}/objectives`;
+    persist(next);
+    try {
+      localStorage.removeItem(`evp-pre-answers-m${id}`);
+      localStorage.removeItem(`evp-post-answers-m${id}`);
+    } catch { /* ignore */ }
+  }
+
+  return (
+    <GCtx.Provider value={{ gs, updateModPct, savePretestResult, savePracticeActivity, finalizePosttest, retryModule }}>
+      {children}
+    </GCtx.Provider>
+  );
+}
+
+// ─── Static content ───────────────────────────────────────────────────────────
 const moduleIcons = [BookOpen, Store, ScanLine] as const;
 const moduleArt = [module1Art, module2Art, module3Art] as const;
-const modules: Module[] = Object.values(MODULES).map((module, index) => ({
+const modules: ModuleUI[] = Object.values(MODULES).map((module, index) => ({
   id: module.id,
   title: module.title,
   subtitle: module.subtitle,
@@ -222,22 +428,6 @@ const modules: Module[] = Object.values(MODULES).map((module, index) => ({
   art: moduleArt[index],
 }));
 const moduleContent = (id: number) => MODULES[id] || MODULES[1];
-
-// ─── Progress hook ────────────────────────────────────────────────────────────
-type Progress = { m1: number; m2: number; m3: number; section: string; score1?: number; score2?: number; score3?: number; lastModule?: number; lastRoute?: string };
-function useProgress() {
-  const [p, setP] = useState<Progress>(() => {
-    try {
-      const value = JSON.parse(localStorage.getItem("evp-progress") || "{}");
-      if (!value || typeof value !== "object") throw new Error("Invalid progress");
-      return { m1: Number(value.m1) || 0, m2: Number(value.m2) || 0, m3: Number(value.m3) || 0, section: typeof value.section === "string" ? value.section : "", score1: Number(value.score1) || undefined, score2: Number(value.score2) || undefined, score3: Number(value.score3) || undefined, lastModule: [1, 2, 3].includes(value.lastModule) ? value.lastModule : undefined, lastRoute: typeof value.lastRoute === "string" ? value.lastRoute : undefined };
-    } catch {
-      return { m1: 0, m2: 0, m3: 0, section: "" };
-    }
-  });
-  useEffect(() => { localStorage.setItem("evp-progress", JSON.stringify(p)); }, [p]);
-  return [p, setP] as const;
-}
 
 // ─── Language sheet ───────────────────────────────────────────────────────────
 function LanguageSheet({ close }: { close: () => void }) {
@@ -333,32 +523,21 @@ function useLocalAudio() {
   function toggle(src: string) {
     const current = audioRef.current;
     if (current && activeSrc === src && !current.paused) {
-      current.pause();
-      setActiveSrc(undefined);
-      return;
+      current.pause(); setActiveSrc(undefined); return;
     }
-
     current?.pause();
     const next = new Audio(src);
     audioRef.current = next;
-    setElapsed(0);
-    setDuration(0);
-    setActiveSrc(src);
+    setElapsed(0); setDuration(0); setActiveSrc(src);
     next.onloadedmetadata = () => setDuration(Number.isFinite(next.duration) ? next.duration : 0);
     next.ontimeupdate = () => setElapsed(next.currentTime);
-    next.onended = () => {
-      setActiveSrc(undefined);
-      setElapsed(0);
-    };
+    next.onended = () => { setActiveSrc(undefined); setElapsed(0); };
     void next.play().catch(() => setActiveSrc(undefined));
   }
 
   function stop() {
-    audioRef.current?.pause();
-    audioRef.current = null;
-    setActiveSrc(undefined);
-    setElapsed(0);
-    setDuration(0);
+    audioRef.current?.pause(); audioRef.current = null;
+    setActiveSrc(undefined); setElapsed(0); setDuration(0);
   }
 
   return { activeSrc, duration, elapsed, toggle, stop };
@@ -368,14 +547,18 @@ function useLocalAudio() {
 function HomePage() {
   const nav = useNavigate();
   const { t } = useLang();
-  const [p] = useProgress();
-  const returning = p.m1 > 0 || p.m2 > 0 || p.m3 > 0;
-  const completedCount = [p.m1, p.m2, p.m3].filter(v => v >= 100).length;
-  const overallPct = Math.round((p.m1 + p.m2 + p.m3) / 3);
+  const { gs } = useGlobalState();
+  const mods = gs.mods;
+  const pcts = [mods[1]?.pct ?? 0, mods[2]?.pct ?? 0, mods[3]?.pct ?? 0];
+  const returning = pcts.some(p => p > 0);
+  const completedCount = pcts.filter(v => v >= 100).length;
+  const overallPct = Math.round(pcts.reduce((s, v) => s + v, 0) / 3);
 
-  const activeModule = p.lastModule || (p.m1 > 0 && p.m1 < 100 ? 1 : p.m2 > 0 && p.m2 < 100 ? 2 : p.m3 > 0 && p.m3 < 100 ? 3 : null);
-  const m = activeModule ? modules[activeModule - 1] : null;
-  const mProgress = activeModule === 1 ? p.m1 : activeModule === 2 ? p.m2 : p.m3;
+  const activeId = gs.lastModule || ([1, 2, 3].find(id => (mods[id]?.pct ?? 0) > 0 && (mods[id]?.pct ?? 0) < 100) ?? null);
+  const m = activeId ? modules[activeId - 1] : null;
+  const mProgress = activeId ? (mods[activeId]?.pct ?? 0) : 0;
+  const mSection = activeId ? (mods[activeId]?.section || "") : "";
+  const mRoute = activeId ? (mods[activeId]?.lastRoute || gs.lastRoute || `/module/${activeId}/reading`) : "";
 
   return (
     <Shell back={false}>
@@ -390,9 +573,9 @@ function HomePage() {
       </section>
 
       {returning && m ? (
-        <section className="continue-card" onClick={() => nav(p.lastRoute || `/module/${activeModule}/reading`)}>
+        <section className="continue-card" onClick={() => nav(mRoute)}>
           <span>{t.continueLearning.toUpperCase()}</span>
-          <div><b>Module 0{activeModule} · {m.title}</b><p>{p.section || `Reading · ${m.reading}`}</p></div>
+          <div><b>Module 0{activeId} · {m.title}</b><p>{mSection || `Reading · ${m.reading}`}</p></div>
           <ProgressBar value={mProgress} color={m.accent} />
           <footer><small>{t.percentComplete(mProgress)}</small><ArrowRight size={19} /></footer>
         </section>
@@ -412,7 +595,7 @@ function HomePage() {
       </section>
       <div className="module-preview">
         {modules.map(mod => {
-          const prog = mod.id === 1 ? p.m1 : mod.id === 2 ? p.m2 : p.m3;
+          const prog = mods[mod.id]?.pct ?? 0;
           return <MiniModule key={mod.id} m={mod} onClick={() => nav(`/module/${mod.id}`)} progress={prog} t={t} />;
         })}
       </div>
@@ -428,7 +611,7 @@ function HomePage() {
   );
 }
 
-function Quick2({ icon: I, label, onClick }: { icon: any; label: string; onClick: () => void }) {
+function Quick2({ icon: I, label, onClick }: { icon: React.ElementType; label: string; onClick: () => void }) {
   return (
     <button onClick={onClick} className="quick2">
       <I size={22} />
@@ -437,7 +620,7 @@ function Quick2({ icon: I, label, onClick }: { icon: any; label: string; onClick
   );
 }
 
-function MiniModule({ m, onClick, progress, t }: { m: Module; onClick: () => void; progress: number; t: typeof T.id }) {
+function MiniModule({ m, onClick, progress, t }: { m: ModuleUI; onClick: () => void; progress: number; t: typeof T.id }) {
   const I = m.icon;
   return (
     <button className="mini-module" onClick={onClick}>
@@ -452,7 +635,7 @@ function MiniModule({ m, onClick, progress, t }: { m: Module; onClick: () => voi
 function ModulesPage() {
   const nav = useNavigate();
   const { t } = useLang();
-  const [p] = useProgress();
+  const { gs } = useGlobalState();
   return (
     <Shell title={t.navModules}>
       <div className="page-title">
@@ -461,7 +644,7 @@ function ModulesPage() {
       </div>
       <div className="module-list">
         {modules.map(m => {
-          const prog = m.id === 1 ? p.m1 : m.id === 2 ? p.m2 : p.m3;
+          const prog = gs.mods[m.id]?.pct ?? 0;
           return <ModuleCard key={m.id} m={m} progress={prog} onClick={() => nav(`/module/${m.id}`)} />;
         })}
       </div>
@@ -469,13 +652,13 @@ function ModulesPage() {
   );
 }
 
-function ModuleCard({ m, progress, onClick }: { m: Module; progress: number; onClick: () => void }) {
+function ModuleCard({ m, progress, onClick }: { m: ModuleUI; progress: number; onClick: () => void }) {
   const { t } = useLang();
   const I = m.icon;
   const statusLabel = progress >= 100 ? t.completed : progress > 0 ? t.inProgress : t.notStarted;
   const ctaLabel = progress >= 100 ? t.reviewModule : progress > 0 ? t.continueModule : t.startModule;
   return (
-    <article className="module-card" style={{ "--accent": m.accent, "--tint": m.tint } as any}>
+    <article className="module-card" style={{ "--accent": m.accent, "--tint": m.tint } as React.CSSProperties}>
       <div className="module-card-top">
         <span className="module-number">0{m.id}</span>
         <span className="status"><CircleDot size={13} />{statusLabel}</span>
@@ -500,7 +683,7 @@ function Overview() {
   const m = modules[id - 1];
   const content = moduleContent(id);
   const I = m.icon;
-  const [, setP] = useProgress();
+  const { updateModPct } = useGlobalState();
   return (
     <Shell title={`Module 0${id}`}>
       <div className="overview-hero" style={{ background: m.tint }}>
@@ -527,7 +710,10 @@ function Overview() {
           ))}
         </div>
       </section>
-      <Button onClick={() => { setP(q => ({ ...q, [`m${id}`]: 10, section: "Tujuan Pembelajaran", lastModule: id, lastRoute: `/module/${id}/objectives` })); nav(`/module/${id}/objectives`); }}>
+      <Button onClick={() => {
+        updateModPct(id, 10, t.learningObjectives, `/module/${id}/objectives`);
+        nav(`/module/${id}/objectives`);
+      }}>
         {t.startModule} <ArrowRight size={18} />
       </Button>
     </Shell>
@@ -591,13 +777,11 @@ function Quiz({ post = false }: { post?: boolean }) {
   const id = Number(useLocation().pathname.split("/")[2]) || 1;
   const [index, setIndex] = useState(0);
   const answerStorageKey = `evp-${post ? "post" : "pre"}-answers-m${id}`;
-  const [answers, setAnswers] = useState<number[]>(() => {
+  const [answers, setAnswers] = useState<(number | undefined)[]>(() => {
     try {
       const stored = JSON.parse(localStorage.getItem(answerStorageKey) || "[]");
-      return Array.isArray(stored) ? stored.filter(value => Number.isInteger(value)) : [];
-    } catch {
-      return [];
-    }
+      return Array.isArray(stored) ? stored : [];
+    } catch { return []; }
   });
   const module = modules[id - 1];
   const questions = post ? moduleContent(id).posttest : moduleContent(id).pretest;
@@ -654,13 +838,34 @@ function SubmitConfirm({ post = false }: { post?: boolean }) {
   const nav = useNavigate();
   const { t } = useLang();
   const id = Number(useLocation().pathname.split("/")[2]) || 1;
+  const questions = post ? moduleContent(id).posttest : moduleContent(id).pretest;
+  const answerKey = `evp-${post ? "post" : "pre"}-answers-m${id}`;
+
+  const answeredCount = useMemo(() => {
+    try {
+      const stored: (number | undefined)[] = JSON.parse(localStorage.getItem(answerKey) || "[]");
+      return stored.filter((a) => typeof a === "number" && Number.isInteger(a)).length;
+    } catch { return 0; }
+  }, [answerKey]);
+
+  const allAnswered = answeredCount === questions.length;
+
   return (
     <Shell title={t.reviewAndSubmit}>
       <div className="empty submit">
         <div><ClipboardCheck size={34} /></div>
         <h2>{t.submitConfirmTitle}</h2>
         <p>{t.submitConfirmDesc}</p>
-        <aside className="info-box"><Info size={18} /><p>{t.answersReady(7, 10)}</p></aside>
+        <aside className="info-box">
+          <Info size={18} />
+          <p>{t.answersReady(answeredCount, questions.length)}</p>
+        </aside>
+        {!allAnswered && (
+          <aside className="info-box warn">
+            <AlertTriangle size={18} />
+            <p>{post ? "Pastikan semua soal dijawab sebelum submit." : "Pastikan semua soal dijawab."}</p>
+          </aside>
+        )}
         <Button onClick={() => nav(`/module/${id}/${post ? "postresult" : "preresult"}`)}>
           {t.submitAnswers}
         </Button>
@@ -674,16 +879,43 @@ function SubmitConfirm({ post = false }: { post?: boolean }) {
 function PreResult() {
   const nav = useNavigate();
   const { t } = useLang();
+  const { gs, savePretestResult, updateModPct } = useGlobalState();
   const id = Number(useLocation().pathname.split("/")[2]) || 1;
+  const modState = gs.mods[id];
+
+  const { preScore, preCorrect, preIncorrect } = useMemo(() => {
+    if (modState?.pretestResult) {
+      return { preScore: modState.pretestResult.score, preCorrect: modState.pretestResult.correct, preIncorrect: modState.pretestResult.incorrect };
+    }
+    try {
+      const answers: (number | undefined)[] = JSON.parse(localStorage.getItem(`evp-pre-answers-m${id}`) || "[]");
+      const result = calculateQuizScore(moduleContent(id).pretest, answers);
+      return { preScore: result.percentage, preCorrect: result.correct, preIncorrect: result.incorrect };
+    } catch {
+      return { preScore: 0, preCorrect: 0, preIncorrect: 0 };
+    }
+  }, [id, modState?.pretestResult]);
+
+  useEffect(() => {
+    if (!modState?.pretestResult) {
+      savePretestResult(id, { score: preScore, correct: preCorrect, incorrect: preIncorrect });
+    }
+  }, [id]);
+
   return (
     <Shell title={t.preResult}>
       <div className="calm-score">
         <span>{t.startingScore}</span>
-        <h1>60<small>/100</small></h1>
-        <p>{t.correctCount(6, 4)}</p>
+        <h1>{preScore}<small>/100</small></h1>
+        <p>{t.correctCount(preCorrect, preIncorrect)}</p>
       </div>
       <aside className="info-box"><Info size={19} /><p>{t.pretestNote}</p></aside>
-      <Button onClick={() => nav(`/module/${id}/theory`)}>{t.continueToLearning} <ArrowRight size={18} /></Button>
+      <Button onClick={() => {
+        updateModPct(id, 20, t.learningMaterial, `/module/${id}/theory`);
+        nav(`/module/${id}/theory`);
+      }}>
+        {t.continueToLearning} <ArrowRight size={18} />
+      </Button>
     </Shell>
   );
 }
@@ -694,7 +926,7 @@ function Theory() {
   const { t, lang } = useLang();
   const id = Number(useLocation().pathname.split("/")[2]) || 1;
   const content = moduleContent(id);
-  const [, setP] = useProgress();
+  const { updateModPct } = useGlobalState();
 
   const c = {
     defTitle: lang === "id" ? "Pengertian & Tujuan" : "Definition & Purpose",
@@ -757,7 +989,7 @@ function Theory() {
       <p className="eyebrow">MODULE 0{id} · {modules[id - 1].title.toUpperCase()}</p>
       <div className="page-title compact">
         <h1>{t.learningMaterial}</h1>
-        <p>{t.stepLearn} · Step 2 of 4</p>
+        <p>{t.learnStep} · {t.stepOf(2, 4)}</p>
       </div>
       <figure className="lesson-visual">
         <img src={lessonExtra.art} alt={lessonExtra.artAlt} />
@@ -792,20 +1024,25 @@ function Theory() {
         <h2>{lang === "id" ? lessonExtra.exampleTitle : "Short Example"}</h2>
         <p>{lessonExtra.example}</p>
       </section>
-      <Button onClick={() => { setP(q => ({ ...q, [`m${id}`]: 25, section: "Pratinjau Kosakata", lastModule: id, lastRoute: `/module/${id}/vocabulary` })); nav(`/module/${id}/vocabulary`); }}>
+      <Button onClick={() => {
+        updateModPct(id, 35, t.vocabPreview, `/module/${id}/vocabulary`);
+        nav(`/module/${id}/vocabulary`);
+      }}>
         {t.vocabPreview} <ArrowRight size={18} />
       </Button>
     </Shell>
   );
 }
 
+// ─── Vocabulary ───────────────────────────────────────────────────────────────
 function Vocabulary() {
   const nav = useNavigate();
   const { t, lang } = useLang();
   const id = Number(useLocation().pathname.split("/")[2]) || 1;
-  const { activeSrc, toggle } = useLocalAudio();
-  const [, setP] = useProgress();
-  const words = moduleContent(id).vocabulary;
+  const { activeSrc, toggle, stop } = useLocalAudio();
+  const { updateModPct } = useGlobalState();
+  const words = moduleContent(id).vocabularyPreview; // 5 preview words
+
   return (
     <Shell title={`${lang === "id" ? "Modul" : "Module"} 0${id}`}>
       <div className="page-title">
@@ -815,168 +1052,88 @@ function Vocabulary() {
       <div className="vocab-list">
         {words.map(({ word, pos: type, meaning }, index) => {
           const source = `/audio/vocabulary/m${id}-${index + 1}.wav`;
+          const available = hasAudio("vocabulary", source);
           const playing = activeSrc === source;
           return (
-          <article key={word}>
-            <div>
-              <h3>{word}</h3>
-              <span>{type}</span>
-              <p>{meaning}</p>
-            </div>
-            <button className={playing ? "playing" : ""} onClick={() => toggle(source)} aria-label={`Play pronunciation for ${word}`}>
-              {playing ? <Pause size={18} /> : <Volume2 size={18} />}
-            </button>
-          </article>
+            <article key={word}>
+              <div>
+                <h3>{word}</h3>
+                <span>{type}</span>
+                <p>{meaning}</p>
+              </div>
+              {available ? (
+                <button
+                  className={playing ? "playing" : ""}
+                  onClick={() => toggle(source)}
+                  aria-label={`${t.playPronunciation} ${word}`}
+                >
+                  {playing ? <Pause size={18} /> : <Volume2 size={18} />}
+                </button>
+              ) : (
+                <button
+                  className="audio-unavailable"
+                  disabled
+                  aria-disabled="true"
+                  aria-label={t.audioUnavailable}
+                  title={t.audioUnavailable}
+                >
+                  <Volume2 size={18} />
+                </button>
+              )}
+            </article>
           );
         })}
       </div>
-      <Button onClick={() => { setP(q => ({ ...q, [`m${id}`]: Math.max(q[`m${id}` as "m1" | "m2" | "m3"], 35), section: "Teks Bacaan", lastModule: id, lastRoute: `/module/${id}/reading` })); nav(`/module/${id}/reading`); }}>{t.continueToReading} <ArrowRight size={18} /></Button>
+      <Button onClick={() => {
+        stop();
+        updateModPct(id, 45, lang === "id" ? "Teks Bacaan" : "Reading", `/module/${id}/reading`);
+        nav(`/module/${id}/reading`);
+      }}>
+        {t.continueToReading} <ArrowRight size={18} />
+      </Button>
     </Shell>
   );
 }
 
-// ─── Reading ──────────────────────────────────────────────────────────────────
+// ─── Glossary fallback map ─────────────────────────────────────────────────────
 const GLOSS: Record<string, { pos: string; meaning: string }> = {
-  affordable:   { pos: "adjective", meaning: "Terjangkau; dapat dibeli oleh banyak orang." },
-  supplier:     { pos: "noun", meaning: "Pemasok; pihak yang menyediakan barang atau bahan." },
-  "flat-pack":  { pos: "noun", meaning: "Kemasan datar; furnitur yang dikemas tipis untuk dirakit sendiri." },
-  assemble:     { pos: "verb", meaning: "Merakit; menyusun bagian-bagian menjadi satu kesatuan." },
-  innovation:   { pos: "noun", meaning: "Inovasi; ide atau cara baru yang membawa perubahan." },
-  boycott:      { pos: "verb/noun", meaning: "Memboikot; menolak menggunakan sesuatu sebagai bentuk protes." },
-  revolutionary:{ pos: "adjective", meaning: "Revolusioner; membawa perubahan besar dan mendasar." },
-  retailer:     { pos: "noun", meaning: "Pengecer; penjual yang menjual langsung ke konsumen." },
-  casing:       { pos: "noun", meaning: "Casing; badan atau penutup luar perangkat." },
-  integrated:   { pos: "adjective", meaning: "Terintegrasi; tergabung menjadi satu sistem." },
-  sturdy:       { pos: "adjective", meaning: "Kokoh; kuat dan tidak mudah rusak." },
-  adjustable:   { pos: "adjective", meaning: "Dapat disesuaikan; bisa diubah posisi atau tingginya." },
-  durable:      { pos: "adjective", meaning: "Tahan lama; kuat dalam jangka waktu panjang." },
-  visibility:   { pos: "noun", meaning: "Visibilitas; kemampuan untuk dilihat dengan jelas." },
-  crisis:       { pos: "noun", meaning: "Krisis; masalah besar yang membutuhkan penyelesaian." },
-  suppliers:    { pos: "noun", meaning: "Pemasok; pihak yang menyediakan barang atau bahan." },
-  genuine:      { pos: "adjective", meaning: "Asli; terbuat dari bahan yang benar atau autentik." },
+  affordable:           { pos: "adjective",   meaning: "Terjangkau; dapat dibeli oleh banyak orang." },
+  supplier:             { pos: "noun",        meaning: "Pemasok; pihak yang menyediakan barang atau bahan." },
+  suppliers:            { pos: "noun",        meaning: "Pemasok; pihak yang menyediakan barang atau bahan." },
+  boycott:              { pos: "verb/noun",   meaning: "Memboikot; menolak menggunakan sesuatu sebagai bentuk protes." },
+  "flat-pack":          { pos: "noun",        meaning: "Kemasan datar; furnitur dikemas tipis untuk dirakit sendiri." },
+  assemble:             { pos: "verb",        meaning: "Merakit; menyusun bagian-bagian menjadi satu kesatuan." },
+  retailer:             { pos: "noun",        meaning: "Pengecer; penjual yang menjual langsung ke konsumen." },
+  delivery:             { pos: "noun",        meaning: "Pengiriman; proses mengantar barang ke pelanggan." },
+  sleek:                { pos: "adjective",   meaning: "Halus, modern, dan elegan." },
+  casing:               { pos: "noun",        meaning: "Badan atau penutup luar perangkat." },
+  integrated:           { pos: "adjective",   meaning: "Terintegrasi; tergabung menjadi satu sistem." },
+  sturdy:               { pos: "adjective",   meaning: "Kokoh; kuat dan tidak mudah rusak." },
+  "dual-screen display":{ pos: "noun phrase", meaning: "Layar ganda untuk kasir dan pembeli." },
+  finish:               { pos: "noun",        meaning: "Lapisan akhir permukaan produk." },
+  adjustable:           { pos: "adjective",   meaning: "Dapat disesuaikan; bisa diubah posisi atau tingginya." },
+  durable:              { pos: "adjective",   meaning: "Tahan lama; kuat dalam jangka waktu panjang." },
+  "gondola shelving":   { pos: "noun phrase", meaning: "Rak gondola; rak display standar supermarket." },
+  "open-front":         { pos: "adjective",   meaning: "Terbuka pada bagian depan." },
+  visibility:           { pos: "noun",        meaning: "Visibilitas; kemampuan untuk dilihat dengan jelas." },
+  genuine:              { pos: "adjective",   meaning: "Asli; terbuat dari bahan yang autentik." },
+  asymmetrical:         { pos: "adjective",   meaning: "Tidak simetris." },
+  "eye-catching":       { pos: "adjective",   meaning: "Menarik perhatian." },
+  centerpiece:          { pos: "noun",        meaning: "Produk utama pusat tampilan." },
+  merchandise:          { pos: "noun",        meaning: "Barang dagangan." },
+  greet:                { pos: "imperative verb", meaning: "Menyapa; mengucapkan salam kepada pelanggan." },
+  scan:                 { pos: "verb",        meaning: "Memindai; membaca kode barcode produk." },
+  verify:               { pos: "verb",        meaning: "Memeriksa; memastikan kebenaran data." },
+  "payment method":     { pos: "noun phrase", meaning: "Metode pembayaran yang dipilih pelanggan." },
+  enter:                { pos: "imperative verb", meaning: "Memasukkan; menginput jumlah uang ke sistem." },
+  change:               { pos: "noun",        meaning: "Kembalian; uang sisa yang dikembalikan ke pelanggan." },
+  receipt:              { pos: "noun",        meaning: "Struk belanja; bukti pembayaran resmi." },
+  "hand over":          { pos: "verb phrase", meaning: "Menyerahkan; memberikan barang kepada pelanggan." },
+  innovation:           { pos: "noun",        meaning: "Inovasi; ide atau cara baru yang membawa perubahan." },
+  crisis:               { pos: "noun",        meaning: "Krisis; masalah besar yang membutuhkan penyelesaian." },
 };
 
-type ReadingSection = { label?: string; text: string[]; highlightMap?: Record<string, string> };
-type ReadingData = {
-  texts: {
-    title: string;
-    subtitle?: string;
-    illustration: string;
-    sections: { heading: string; body: string; highlights?: string[] }[];
-  }[];
-};
-
-const READING_DATA: Record<number, ReadingData> = {
-  1: {
-    texts: [{
-      title: "THE STORY OF IKEA",
-      subtitle: "Innovation in Furniture Retail",
-      illustration: "Flat-pack furniture, made for everyday life.",
-      sections: [
-        {
-          heading: "ORIENTATION",
-          body: "Long ago in 1943, a 17-year-old boy named Ingvar Kamprad founded a small business in Älmhult, Sweden. He wanted to create affordable furniture that ordinary people could buy and enjoy in their homes.",
-          highlights: ["affordable"],
-        },
-        {
-          heading: "COMPLICATION",
-          body: "As IKEA grew, its suppliers faced a boycott from competitors. Delivery of goods became difficult and expensive. The company needed a revolutionary way to solve its supply and cost problems.",
-          highlights: ["boycott", "revolutionary"],
-        },
-        {
-          heading: "RESOLUTION",
-          body: "IKEA developed the flat-pack concept — furniture packed flat in boxes so customers could carry it home easily and assemble it themselves. This innovation reduced shipping costs and changed the furniture retailer industry forever.",
-          highlights: ["flat-pack", "assemble", "retailer"],
-        },
-        {
-          heading: "RE-ORIENTATION",
-          body: "Today, IKEA operates in more than 50 countries and serves millions of customers worldwide. Its story is a powerful example of innovation and the spirit of making great design accessible to everyone.",
-          highlights: ["innovation"],
-        },
-      ],
-    }],
-  },
-  2: {
-    texts: [
-      {
-        title: "Modern Touchscreen POS Terminal",
-        subtitle: "Product Category: Retail Hardware / POS System",
-        illustration: "Retail point-of-sale hardware for modern stores.",
-        sections: [
-          {
-            heading: "IDENTIFICATION",
-            body: "The Modern Touchscreen POS Terminal is a high-performance point-of-sale device designed specifically for busy retail environments.",
-            highlights: [],
-          },
-          {
-            heading: "DESCRIPTION",
-            body: "It features a sleek aluminum casing with a dual-screen display — one screen faces the cashier and one faces the customer. The system has an integrated barcode scanner, receipt printer, and card payment reader. Its sturdy construction ensures it can withstand daily use in demanding retail settings. The matte black finish gives it a professional and modern appearance.",
-            highlights: ["casing", "integrated", "sturdy"],
-          },
-        ],
-      },
-      {
-        title: "Heavy-Duty Supermarket Gondola Shelving",
-        subtitle: "Product Category: Store Fixtures & Display",
-        illustration: "Gondola shelving for supermarket display and merchandising.",
-        sections: [
-          {
-            heading: "IDENTIFICATION",
-            body: "The Heavy-Duty Supermarket Gondola Shelving is a commercial-grade retail fixture widely used in supermarkets, convenience stores, and hypermarkets.",
-            highlights: [],
-          },
-          {
-            heading: "DESCRIPTION",
-            body: "Each unit consists of a steel frame with adjustable shelves that can be repositioned at different heights. The shelving is made from durable powder-coated steel that resists rust and damage. Its open-front design allows customers to see and reach products easily, maximizing product visibility and encouraging purchases.",
-            highlights: ["adjustable", "durable", "visibility"],
-          },
-        ],
-      },
-      {
-        title: "Vintage Leather Biker Jacket",
-        subtitle: "Product Example: Urban Rider Jacket · Fashion & Merchandise Display",
-        illustration: "Fashion merchandise for retail display and visual merchandising.",
-        sections: [
-          {
-            heading: "IDENTIFICATION",
-            body: "The Urban Rider Jacket is a premium vintage-style leather biker jacket designed for fashion-forward retail display and customer appeal.",
-            highlights: [],
-          },
-          {
-            heading: "DESCRIPTION",
-            body: "The jacket is crafted from full-grain genuine leather with a classic asymmetrical zip closure. It features wide lapels, two front zippered pockets, and a quilted inner lining for comfort. The distressed finish gives it an authentic vintage character. This jacket is a key display piece for fashion retail stores targeting young adult customers.",
-            highlights: [],
-          },
-        ],
-      },
-    ],
-  },
-  3: {
-    texts: [{
-      title: "HOW TO PROCESS CUSTOMER CHECKOUT USING A POS TERMINAL",
-      subtitle: "Store Standard Operating Procedure",
-      illustration: "POS terminal checkout procedure for retail staff.",
-      sections: [
-        {
-          heading: "GOAL / AIM",
-          body: "To process a customer's purchase accurately and efficiently using a POS (Point of Sale) terminal, ensuring a smooth checkout experience.",
-          highlights: [],
-        },
-        {
-          heading: "MATERIALS / EQUIPMENT",
-          body: "POS terminal with touchscreen display · Barcode scanner · Receipt printer · Card payment reader (EDC machine) · Cash drawer · Price tags and product barcodes",
-          highlights: [],
-        },
-        {
-          heading: "STEPS / PROCEDURES",
-          body: "1. GREET — Welcome the customer warmly as they approach the counter.\n2. SCAN — Scan each product's barcode using the barcode scanner.\n3. VERIFY — Confirm the product name and price on the POS screen with the customer.\n4. PAYMENT METHOD — Ask the customer whether they will pay by cash or card.\n5. INSERT / ENTER — For card payment: insert or tap the card on the EDC machine. For cash: enter the amount received.\n6. PRINT / ATTACH / HAND OVER — Print the receipt, attach it to the bag if applicable, and hand it over to the customer with a thank-you.",
-          highlights: [],
-        },
-      ],
-    }],
-  },
-};
-
+// ─── Reading ──────────────────────────────────────────────────────────────────
 function Reading() {
   const nav = useNavigate();
   const { t, lang } = useLang();
@@ -985,7 +1142,7 @@ function Reading() {
   const [glossWord, setGlossWord] = useState<string | undefined>();
   const { activeSrc, duration, elapsed, toggle, stop } = useLocalAudio();
   const [textIndex, setTextIndex] = useState(0);
-  const [, setP] = useProgress();
+  const { updateModPct } = useGlobalState();
 
   const texts = moduleContent(id).readings;
   const current = texts[textIndex] || texts[0];
@@ -994,30 +1151,37 @@ function Reading() {
   useEffect(() => { setTextIndex(0); }, [id]);
   useEffect(() => { stop(); }, [textIndex]);
 
-  const fmt = (s: number) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+  const fmt = (s: number) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
   const audioSource = `/audio/reading/m${id}-${textIndex + 1}.wav`;
+  const audioAvailable = hasAudio("reading", audioSource);
   const playing = activeSrc === audioSource;
 
-  function renderBody(body: string, highlights: string[] = []) {
-    if (!highlights.length) {
-      return body.split("\n").map((line, i) => <p key={i}>{line}</p>);
-    }
-    const parts: React.ReactNode[] = [];
-    let remaining = body;
-    highlights.forEach(h => {
-      const idx = remaining.toLowerCase().indexOf(h.toLowerCase());
-      if (idx >= 0) {
-        parts.push(remaining.slice(0, idx));
-        parts.push(
-          <button key={h} className="gloss-word" onClick={() => setGlossWord(h)}>
-            {remaining.slice(idx, idx + h.length)}
-          </button>
-        );
-        remaining = remaining.slice(idx + h.length);
+  const readingGlossary = readingGlossaryFor(current);
+
+  function renderBody(body: string, highlights: string[] = []): React.ReactNode[] {
+    const lines = body.split("\n");
+    return lines.map((line, lineIdx) => {
+      if (!line.trim()) return <br key={`br-${lineIdx}`} />;
+      if (!highlights.length) return <p key={lineIdx}>{line}</p>;
+
+      const parts: React.ReactNode[] = [];
+      let remaining = line;
+
+      for (const h of highlights) {
+        const idx = remaining.toLowerCase().indexOf(h.toLowerCase());
+        if (idx >= 0) {
+          if (idx > 0) parts.push(remaining.slice(0, idx));
+          parts.push(
+            <button key={`${h}-${lineIdx}`} className="gloss-word" onClick={() => setGlossWord(h.toLowerCase())}>
+              {remaining.slice(idx, idx + h.length)}
+            </button>
+          );
+          remaining = remaining.slice(idx + h.length);
+        }
       }
+      if (remaining) parts.push(remaining);
+      return <p key={lineIdx}>{parts.length > 1 || parts.some(p => typeof p !== "string") ? parts : line}</p>;
     });
-    parts.push(remaining);
-    return <p>{parts}</p>;
   }
 
   return (
@@ -1027,7 +1191,16 @@ function Reading() {
         <>
           <p className="eyebrow" style={{ marginTop: 2, color: m.accent }}>{t.subMaterialOf(textIndex + 1, texts.length)}</p>
           <div className="reading-selector" aria-label={lang === "id" ? "Pilih teks bacaan" : "Choose reading text"}>
-            {texts.map((text, index) => <button key={text.title} className={index === textIndex ? "selected" : ""} onClick={() => setTextIndex(index)} aria-label={`${lang === "id" ? "Teks" : "Text"} ${index + 1}: ${text.title}`}>{index + 1}</button>)}
+            {texts.map((text, index) => (
+              <button
+                key={text.title}
+                className={index === textIndex ? "selected" : ""}
+                onClick={() => setTextIndex(index)}
+                aria-label={`${lang === "id" ? "Teks" : "Text"} ${index + 1}: ${text.title}`}
+              >
+                {index + 1}
+              </button>
+            ))}
           </div>
         </>
       )}
@@ -1042,14 +1215,30 @@ function Reading() {
 
       <article className="audio-card">
         <div className="audio-icon"><Headphones size={21} /></div>
-        <div><b>{t.listenToReading}</b><small>{t.localAudio}</small></div>
-        <button onClick={() => toggle(audioSource)} aria-label={playing ? "Pause audio" : "Play audio"}>
-          {playing ? <Pause size={19} /> : <Play size={19} />}
-        </button>
-        <div className="audio-progress">
-          <i style={{ width: `${duration ? Math.min(100, (elapsed / duration) * 100) : 0}%` }} />
+        <div>
+          <b>{t.listenToReading}</b>
+          <small>{audioAvailable ? t.localAudio : t.audioUnavailable}</small>
         </div>
-        <small>{fmt(elapsed)} <span>{duration ? fmt(duration) : t.localAudio}</span></small>
+        {audioAvailable ? (
+          <button
+            onClick={() => toggle(audioSource)}
+            aria-label={playing ? (lang === "id" ? "Jeda audio" : "Pause audio") : (lang === "id" ? "Putar audio" : "Play audio")}
+          >
+            {playing ? <Pause size={19} /> : <Play size={19} />}
+          </button>
+        ) : (
+          <button disabled aria-disabled="true" aria-label={t.audioUnavailable} className="audio-unavailable">
+            <Play size={19} />
+          </button>
+        )}
+        {audioAvailable && (
+          <>
+            <div className="audio-progress">
+              <i style={{ width: `${duration ? Math.min(100, (elapsed / duration) * 100) : 0}%` }} />
+            </div>
+            <small>{fmt(elapsed)} <span>{duration ? fmt(Math.ceil(duration)) : ""}</span></small>
+          </>
+        )}
       </article>
 
       <article className="reading-copy">
@@ -1062,7 +1251,10 @@ function Reading() {
       </article>
 
       {isLast ? (
-        <Button onClick={() => { setP(q => ({ ...q, [`m${id}`]: 50, section: "Latihan Interaktif", lastModule: id, lastRoute: `/module/${id}/practice` })); nav(`/module/${id}/practice`); }}>
+        <Button onClick={() => {
+          updateModPct(id, 65, lang === "id" ? "Latihan Interaktif" : "Interactive Practice", `/module/${id}/practice`);
+          nav(`/module/${id}/practice`);
+        }}>
           {t.startPractice} <ArrowRight size={18} />
         </Button>
       ) : (
@@ -1071,35 +1263,48 @@ function Reading() {
         </Button>
       )}
 
-      {glossWord && <GlossarySheet word={glossWord} close={() => setGlossWord(undefined)} />}
+      {glossWord && <GlossarySheet word={glossWord} glossary={readingGlossary} close={() => setGlossWord(undefined)} />}
     </Shell>
   );
 }
 
 // ─── Glossary bottom sheet ────────────────────────────────────────────────────
-function GlossarySheet({ word, close }: { word: string; close: () => void }) {
-  const { t } = useLang();
-  const id = Number(useLocation().pathname.split("/")[2]) || 1;
+function GlossarySheet({ word, glossary, close }: { word: string; glossary: Record<string, Word>; close: () => void }) {
+  const { t, lang } = useLang();
   const { activeSrc, toggle } = useLocalAudio();
-  const info = glossaryFor(moduleContent(id))[word.toLowerCase()] || GLOSS[word.toLowerCase()] || { pos: "noun", meaning: "Makna tersedia di kamus." };
-  const audioSource = `/audio/glossary/${word.toLowerCase().replace(/\s+/g, "-")}.wav`;
-  const playing = audioSource === activeSrc;
+  const info = glossary[word.toLowerCase()] || GLOSS[word.toLowerCase()] || { pos: "noun", meaning: lang === "id" ? "Makna tersedia di kamus." : "Meaning available in dictionary." };
+  const audioPath = `/audio/glossary/${word.toLowerCase().replace(/\s+/g, "-")}.wav`;
+  const audioAvailable = hasAudio("glossary", audioPath);
+  const playing = audioPath === activeSrc;
+
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") close(); };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, [close]);
+
   return (
     <div className="sheet-backdrop" onClick={close} role="presentation">
-      <div className="sheet" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={`${word} glossary`}>
+      <div className="sheet" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={`${word} ${lang === "id" ? "glosarium" : "glossary"}`}>
         <i className="handle" />
-        <button className="sheet-close" onClick={close}><X size={20} /></button>
+        <button className="sheet-close" onClick={close} aria-label={lang === "id" ? "Tutup" : "Close"}><X size={20} /></button>
         <span className="eyebrow">{t.wordType.toUpperCase()} · {info.pos.toUpperCase()}</span>
         <h2 style={{ textTransform: "capitalize" }}>{word}</h2>
-        <button className="pronounce" onClick={() => toggle(audioSource)}>
-          {playing ? <Pause size={18} /> : <Volume2 size={18} />}
-          {playing ? t.playingPronunciation : t.playPronunciation}
-        </button>
+        {audioAvailable ? (
+          <button
+            className="pronounce"
+            onClick={() => toggle(audioPath)}
+            aria-label={playing ? (lang === "id" ? "Jeda pengucapan" : "Pause pronunciation") : t.playPronunciation}
+          >
+            {playing ? <Pause size={18} /> : <Volume2 size={18} />}
+            {playing ? t.playingPronunciation : t.playPronunciation}
+          </button>
+        ) : (
+          <button className="pronounce audio-unavailable" disabled aria-disabled="true" aria-label={t.audioUnavailable}>
+            <Volume2 size={18} />
+            <span>{t.audioUnavailable}</span>
+          </button>
+        )}
         <p>{info.meaning}</p>
       </div>
     </div>
@@ -1111,19 +1316,22 @@ function Practice() {
   const nav = useNavigate();
   const { t, lang } = useLang();
   const id = Number(useLocation().pathname.split("/")[2]) || 1;
-  const [, setP] = useProgress();
+  const { updateModPct, savePracticeActivity } = useGlobalState();
   const [stage, setStage] = useState(1);
   const [selectedLeft, setSelectedLeft] = useState<string | undefined>();
   const [pairs, setPairs] = useState<Record<string, string>>({});
   const [checked, setChecked] = useState(false);
+  const [activityScores, setActivityScores] = useState<ActivityResult[]>([]);
   const modulePractices = moduleContent(id).practices;
-  const sequencePractice = modulePractices.find(item => item.type === "sequence");
-  const [order, setOrder] = useState<string[]>(() => sequencePractice && sequencePractice.type === "sequence" ? [...sequencePractice.items] : []);
+  const seqPractice = modulePractices.find(p => p.type === "sequence");
+  const [order, setOrder] = useState<string[]>(() => seqPractice && seqPractice.type === "sequence" ? [...seqPractice.items] : []);
   const practice = modulePractices[stage - 1];
   const isSequence = practice.type === "sequence";
   const matching = isSequence ? undefined : practice;
-  const sequenceIsCorrect = isSequence && order.every((item, index) => item === practice.answer[index]);
+  const sequenceIsCorrect = isSequence && practice.type === "sequence" && order.every((item, i) => item === practice.answer[i]);
   const pairIsCorrect = matching && matching.left.every(left => pairs[left] === matching.pairs[left]);
+  const isCorrect = isSequence ? sequenceIsCorrect : Boolean(pairIsCorrect);
+
   const practiceCopy = {
     id: {
       1: [["Mencocokkan Struktur", "Cocokkan setiap bagian Narrative Text dengan fungsinya."], ["Mencocokkan Kosakata", "Cocokkan kosakata retail dengan makna bahasa Indonesianya."], ["Mengurutkan Peristiwa", "Atur peristiwa cerita dari awal hingga akhir."]],
@@ -1138,17 +1346,41 @@ function Practice() {
   } as const;
   const moduleCopy = practiceCopy[lang][id as 1 | 2 | 3][stage - 1];
 
+  function computeActivityScore(): ActivityResult {
+    if (isSequence && practice.type === "sequence") {
+      const total = practice.answer.length;
+      const correct = practice.answer.filter((item, i) => order[i] === item).length;
+      return { score: total > 0 ? Math.round((correct / total) * 100) / 10 : 0, correct, total, completed: true };
+    } else if (matching) {
+      const total = matching.left.length;
+      const correct = matching.left.filter(l => pairs[l] === matching.pairs[l]).length;
+      return { score: total > 0 ? Math.round((correct / total) * 100) / 10 : 0, correct, total, completed: true };
+    }
+    return { score: 0, correct: 0, total: 0, completed: false };
+  }
+
   function handleCta() {
-    if (!checked) { setChecked(true); return; }
+    if (!checked) {
+      const actScore = computeActivityScore();
+      const newScores = [...activityScores];
+      newScores[stage - 1] = actScore;
+      setActivityScores(newScores);
+      savePracticeActivity(id, stage - 1, actScore);
+      setChecked(true);
+      return;
+    }
     if (stage === modulePractices.length) {
-      setP(current => ({ ...current, [`m${id}`]: Math.max(current[`m${id}` as "m1" | "m2" | "m3"], 70), section: "Post-test", lastModule: id, lastRoute: `/module/${id}/posttest` }));
+      updateModPct(id, 80, "Post-test", `/module/${id}/posttest`);
       nav(`/module/${id}/posttest`);
       return;
     }
-    setStage(stage + 1);
+    const next = stage + 1;
+    setStage(next);
     setSelectedLeft(undefined);
     setPairs({});
     setChecked(false);
+    const nextP = modulePractices[next - 1];
+    if (nextP.type === "sequence") setOrder([...nextP.items]);
   }
 
   function moveItem(index: number, direction: -1 | 1) {
@@ -1174,7 +1406,7 @@ function Practice() {
   }
 
   const canCheck = isSequence ? order.length > 0 : Boolean(matching && matching.left.every(left => pairs[left]));
-  const isCorrect = isSequence ? sequenceIsCorrect : pairIsCorrect;
+  const currentScore = activityScores[stage - 1];
 
   return (
     <Shell title={t.startPractice}>
@@ -1192,32 +1424,48 @@ function Practice() {
             {matching.left.map(left => {
               const paired = pairs[left];
               const correct = checked && paired === matching.pairs[left];
-              const incorrect = checked && paired && !correct;
-              return <button key={left} className={["match-source", selectedLeft === left ? "selected" : "", correct ? "correct" : "", incorrect ? "incorrect" : ""].join(" ").trim()} onClick={() => { setSelectedLeft(left); setChecked(false); }} aria-pressed={selectedLeft === left}>
-                <span><b>{left}</b>{paired && <small>{paired}</small>}</span>{paired ? <Check size={17} /> : <ChevronRight size={17} />}
-              </button>;
+              const incorrect = checked && Boolean(paired) && !correct;
+              return (
+                <button
+                  key={left}
+                  className={["match-source", selectedLeft === left ? "selected" : "", correct ? "correct" : "", incorrect ? "incorrect" : ""].join(" ").trim()}
+                  onClick={() => { setSelectedLeft(left); setChecked(false); }}
+                  aria-pressed={selectedLeft === left}
+                >
+                  <span><b>{left}</b>{paired && <small>{paired}</small>}</span>
+                  {paired ? <Check size={17} /> : <ChevronRight size={17} />}
+                </button>
+              );
             })}
           </div>
           <div>
             <p className="task-label">{lang === "id" ? "PILIH PASANGAN" : "CHOOSE A MATCH"}</p>
-            {matching.right.map(right => <button key={right} className={`match-target${Object.values(pairs).includes(right) ? " paired" : ""}`} onClick={() => chooseRight(right)} disabled={!selectedLeft} aria-disabled={!selectedLeft}>
-              <span>{right}</span>
-            </button>)}
+            {matching.right.map(right => (
+              <button
+                key={right}
+                className={`match-target${Object.values(pairs).includes(right) ? " paired" : ""}`}
+                onClick={() => chooseRight(right)}
+                disabled={!selectedLeft}
+                aria-disabled={!selectedLeft}
+              >
+                <span>{right}</span>
+              </button>
+            ))}
           </div>
         </div>
       ) : (
         <div className="sequence">
-          <p className="sequence-help">Gunakan tombol panah untuk memindahkan setiap peristiwa ke atas atau ke bawah.</p>
+          <p className="sequence-help">{t.sequenceHelp}</p>
           {order.map((x, i) => (
-            <div className={`seq-row${checked ? (sequenceIsCorrect ? " correct" : " incorrect") : ""}`} key={x}>
+            <div className={`seq-row${checked ? (isCorrect ? " correct" : " incorrect") : ""}`} key={x}>
               <div className="seq-item">
                 <GripVertical size={18} className="drag-handle" />
                 <b>{i + 1}</b>
                 <span>{x}</span>
               </div>
               <div className="sequence-controls">
-                <button onClick={() => moveItem(i, -1)} disabled={i === 0} aria-label={`Pindahkan ${x} ke atas`}><ChevronUp size={17} /></button>
-                <button onClick={() => moveItem(i, 1)} disabled={i === order.length - 1} aria-label={`Pindahkan ${x} ke bawah`}><ChevronDown size={17} /></button>
+                <button onClick={() => moveItem(i, -1)} disabled={i === 0} aria-label={t.moveUp(x)}><ChevronUp size={17} /></button>
+                <button onClick={() => moveItem(i, 1)} disabled={i === order.length - 1} aria-label={t.moveDown(x)}><ChevronDown size={17} /></button>
               </div>
             </div>
           ))}
@@ -1228,15 +1476,17 @@ function Practice() {
         <div className={`feedback ${isCorrect ? "good" : "bad"}`}>
           {isCorrect ? <Check size={22} /> : <AlertTriangle size={22} />}
           <div>
-            <b>{isCorrect ? t.greatJob : t.notQuiteYet}</b>
-            <p>{isCorrect ? t.thatCorrect : t.reviewSentence}</p>
+            <b>{isCorrect ? t.greatJob : (currentScore && currentScore.score > 0 ? t.partialCredit : t.notQuiteYet)}</b>
+            <p>
+              {isCorrect ? t.thatCorrect : t.reviewSentence}
+              {currentScore && ` · ${currentScore.score.toFixed(1)}/10`}
+            </p>
           </div>
         </div>
       )}
 
       <Button disabled={!canCheck} onClick={handleCta}>
-        {checked ? t.continueBtn : t.checkAnswer}{" "}
-        <ArrowRight size={18} />
+        {checked ? t.continueBtn : t.checkAnswer} <ArrowRight size={18} />
       </Button>
     </Shell>
   );
@@ -1247,22 +1497,35 @@ function FinalResult() {
   const nav = useNavigate();
   const { t } = useLang();
   const id = Number(useLocation().pathname.split("/")[2]) || 1;
-  const [, setP] = useProgress();
+  const { gs, finalizePosttest, retryModule } = useGlobalState();
   const [animating, setAnimating] = useState(true);
+  const modState = gs.mods[id];
 
   useEffect(() => {
-    setP(q => ({ ...q, [`m${id}`]: 100, [`score${id}`]: 83 }));
+    if (!modState?.posttestResult) {
+      try {
+        const answers: (number | undefined)[] = JSON.parse(localStorage.getItem(`evp-post-answers-m${id}`) || "[]");
+        const questions = moduleContent(id).posttest;
+        const result = calculateQuizScore(questions, answers);
+        const weighted = Math.round((result.correct / questions.length) * 70 * 10) / 10;
+        finalizePosttest(id, { raw: result.percentage, weighted, correct: result.correct, incorrect: result.incorrect });
+      } catch {
+        finalizePosttest(id, { raw: 0, weighted: 0, correct: 0, incorrect: 0 });
+      }
+    }
     const timer = setTimeout(() => setAnimating(false), 900);
     return () => clearTimeout(timer);
-  }, []);
+  }, [id]);
 
-  const pretest = 60;
-  const posttestRaw = 80;
-  const posttestWeighted = 56;
-  const practiceScore = 27;
-  const finalScore = posttestWeighted + practiceScore;
-  const gain = posttestRaw - pretest;
-  const passed = finalScore >= 70;
+  const pretestScore = modState?.pretestResult?.score ?? 0;
+  const posttestRaw = modState?.posttestResult?.raw ?? 0;
+  const posttestWeighted = modState?.posttestResult?.weighted ?? 0;
+  const practiceScore = modState?.practiceScore ?? 0;
+  const finalScore = modState?.finalScore ?? Math.round(posttestWeighted + practiceScore);
+  const gain = posttestRaw - pretestScore;
+  const passed = finalScore >= PASSING_THRESHOLD;
+  const latestScore = modState?.latestScore ?? finalScore;
+  const bestScore = modState?.bestScore ?? finalScore;
 
   return (
     <Shell title={t.moduleResult}>
@@ -1283,30 +1546,31 @@ function FinalResult() {
       </section>
 
       <section className="gain">
-        <div><small>{t.pretestLabel}</small><b>{pretest}</b></div>
+        <div><small>{t.pretestLabel}</small><b>{pretestScore}</b></div>
         <ArrowRight size={16} style={{ color: "#94a3b8", flex: "none" }} />
         <div><small>Post-test</small><b>{posttestRaw}</b></div>
-        <div className="gain-badge">+{gain} {t.improvement}</div>
+        <div className="gain-badge">{gain >= 0 ? "+" : ""}{gain} {t.improvement}</div>
       </section>
 
       <section className="breakdown">
         <h2>{t.yourResult}</h2>
         {[
-          [t.pretestLabel, `${pretest} / 100`],
+          [t.pretestLabel, `${pretestScore} / 100`],
           [t.posttestRaw, `${posttestRaw} / 100`],
-          [t.posttestWeighted, `${posttestWeighted} / 70`],
-          [t.practice, `${practiceScore} / 30`],
+          [t.posttestWeighted, `${posttestWeighted.toFixed(1)} / 70`],
+          [t.practice, `${practiceScore.toFixed(1)} / 30`],
           [t.finalScore, `${finalScore} / 100`],
-        ].map(([a, b]) => <div key={a}><span>{a}</span><b>{b}</b></div>)}
+        ].map(([a, b]) => <div key={a as string}><span>{a}</span><b>{b}</b></div>)}
       </section>
 
       <div className="score-meta">
-        <div><small>{t.latestScore}</small><b>{finalScore}</b></div>
-        <div><small>{t.bestScore}</small><b>{finalScore}</b></div>
+        <div><small>{t.latestScore}</small><b>{latestScore}</b></div>
+        <div><small>{t.bestScore}</small><b>{bestScore}</b></div>
       </div>
 
       <Button onClick={() => nav(`/module/${id}/theory`)}>{t.reviewMaterial}</Button>
-      <Button variant="secondary" onClick={() => nav("/home")}>{t.backToModules}</Button>
+      <Button variant="secondary" onClick={() => { retryModule(id); nav(`/module/${id}/objectives`); }}>{t.tryAgain}</Button>
+      <Button variant="text" onClick={() => nav("/home")}>{t.backToModules}</Button>
     </Shell>
   );
 }
@@ -1315,10 +1579,12 @@ function FinalResult() {
 function ProgressPage() {
   const nav = useNavigate();
   const { t } = useLang();
-  const [p] = useProgress();
-  const completed = [p.m1, p.m2, p.m3].filter(v => v >= 100).length;
-  const overall = Math.round((p.m1 + p.m2 + p.m3) / 3);
-  const empty = !p.m1 && !p.m2 && !p.m3;
+  const { gs } = useGlobalState();
+  const mods = gs.mods;
+  const pcts = [mods[1]?.pct ?? 0, mods[2]?.pct ?? 0, mods[3]?.pct ?? 0];
+  const completed = pcts.filter(v => v >= 100).length;
+  const overall = Math.round(pcts.reduce((s, v) => s + v, 0) / 3);
+  const empty = pcts.every(v => v === 0);
 
   return (
     <Shell back={false} title={t.navProgress}>
@@ -1345,8 +1611,9 @@ function ProgressPage() {
 
           <div className="progress-modules" style={{ marginTop: 24 }}>
             {modules.map(m => {
-              const prog = m.id === 1 ? p.m1 : m.id === 2 ? p.m2 : p.m3;
-              const score = m.id === 1 ? p.score1 : m.id === 2 ? p.score2 : p.score3;
+              const prog = mods[m.id]?.pct ?? 0;
+              const modData = mods[m.id];
+              const score = modData?.latestScore;
               const status = prog >= 100 ? "done" : prog > 0 ? "active" : "idle";
               const statusLabel = prog >= 100 ? t.completed : prog > 0 ? t.inProgress : t.notStarted;
               const I = m.icon;
@@ -1362,7 +1629,7 @@ function ProgressPage() {
                     {prog > 0 && prog < 100 && <ProgressBar value={prog} color={m.accent} />}
                   </div>
                   <div className="pm-right">
-                    {prog >= 100 && score ? <b className="pm-score">{score}</b> : prog > 0 ? <em className="pm-pct">{prog}%</em> : <ChevronRight size={17} style={{ color: "#94a3b8" }} />}
+                    {prog >= 100 && score != null ? <b className="pm-score">{score}</b> : prog > 0 ? <em className="pm-pct">{prog}%</em> : <ChevronRight size={17} style={{ color: "#94a3b8" }} />}
                   </div>
                 </button>
               );
@@ -1424,9 +1691,7 @@ function ProfilePage() {
   return (
     <Shell back={false} title={t.navProfile}>
       <div className="profile-header">
-        <div className="profile-avatar-large">
-          <UserRound size={44} />
-        </div>
+        <div className="profile-avatar-large"><UserRound size={44} /></div>
         <h1>{t.profileTitle}</h1>
         <p>{t.profileSub}</p>
       </div>
@@ -1445,7 +1710,7 @@ function ProfilePage() {
 // ─── Splash ───────────────────────────────────────────────────────────────────
 function Splash() {
   const nav = useNavigate();
-  useEffect(() => { const t = setTimeout(() => nav("/home"), 1200); return () => clearTimeout(t); }, [nav]);
+  useEffect(() => { const timer = setTimeout(() => nav("/home"), 1200); return () => clearTimeout(timer); }, [nav]);
   return (
     <div className="splash">
       <div className="splash-icon"><img src={logo} alt="EVP Learn" /></div>
@@ -1483,5 +1748,11 @@ const router = createBrowserRouter([
 ]);
 
 export default function App() {
-  return <LangProvider><RouterProvider router={router} /></LangProvider>;
+  return (
+    <LangProvider>
+      <StateProvider>
+        <RouterProvider router={router} />
+      </StateProvider>
+    </LangProvider>
+  );
 }
