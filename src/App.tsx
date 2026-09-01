@@ -581,22 +581,20 @@ function HomePage() {
         <p>{returning ? t.continueLearning + "." : t.startJourney}</p>
       </section>
 
-      <div className="home-overlap">
-
-        {returning && m ? (
-          <section className="continue-card premium" onClick={() => nav(mRoute)}>
-            <span>{t.continueLearning.toUpperCase()}</span>
-            <div><b>Module 0{activeId} · {m.title}</b><p>{mSection || `Reading · ${m.reading}`}</p></div>
-            <ProgressBar value={mProgress} color={m.accent} />
-            <footer><small>{t.percentComplete(mProgress)}</small><ArrowRight size={19} /></footer>
-          </section>
-        ) : null}
-
-        <section className="home-section-title">
-          <div><h2>{t.learningProgress}</h2><p>{returning ? "" : t.noProgressYet}</p></div>
-          <b style={{ color: '#2563eb', fontSize: 13, fontWeight: 700 }}>{t.modulesCompletedOf(completedCount)}</b>
+      {returning && m ? (
+        <section className="continue-card premium" onClick={() => nav(mRoute)}>
+          <span>{t.continueLearning.toUpperCase()}</span>
+          <div><b>Module 0{activeId} · {m.title}</b><p>{mSection || `Reading · ${m.reading}`}</p></div>
+          <ProgressBar value={mProgress} color={m.accent} />
+          <footer><small>{t.percentComplete(mProgress)}</small><ArrowRight size={19} /></footer>
         </section>
-        <div style={{ padding: '0 20px' }}><ProgressBar value={overallPct} /></div>
+      ) : null}
+
+      <section className="home-section-title">
+        <div><h2>{t.learningProgress}</h2><p>{returning ? "" : t.noProgressYet}</p></div>
+        <b style={{ color: '#2563eb', fontSize: 13, fontWeight: 700 }}>{t.modulesCompletedOf(completedCount)}</b>
+      </section>
+      <div style={{ padding: '0 20px' }}><ProgressBar value={overallPct} /></div>
 
         <section className="home-section-title" style={{ marginTop: 32 }}>
           <h2>{t.yourModules}</h2>
@@ -622,7 +620,6 @@ function HomePage() {
             <span>{t.learningOutcomes}</span>
           </button>
         </div>
-      </div>
     </Shell>
   );
 }
