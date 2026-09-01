@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import ReadingIllustration from "./illustrations";
 import { MODULES, PASSING_THRESHOLD, readingGlossaryFor, type Reading, type Word } from "./data";
-import logo from "./imports/LOGO.png";
+import logo from "./imports/evp-icon.png";
 import module1Art from "./imports/module-art/module-1-narrative.png";
 import module2Art from "./imports/module-art/module-2-descriptive.png";
 import module3Art from "./imports/module-art/module-3-procedure.png";
