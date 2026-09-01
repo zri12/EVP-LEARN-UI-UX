@@ -417,7 +417,11 @@ button:focus-visible, .gloss-word:focus-visible {
 .practice-match-grid .match-source small { color: currentColor; font-size: 11px; font-weight: 500; }
 .practice-match-grid .match-target { justify-content: center; min-height: 66px; }
 .practice-match-grid .match-target.paired { border-style: solid; border-color: #93c5fd; background: #eff6ff; color: #1e40af; }
-.practice-match-grid .match-target:disabled { opacity: .52; cursor: not-allowed; }
+.practice-match-grid .match-target[aria-disabled="true"]:not(.drag-over) { opacity: .52; cursor: not-allowed; }
+.match-source.dragging { opacity: 0.6; background: #f8fafc; cursor: grabbing; }
+.match-target.drag-over { border-color: #2563eb; background: #eff6ff; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+.match-drag-handle { cursor: grab; color: #94a3b8; display: flex; align-items: center; justify-content: center; padding: 12px 8px; margin: -10px 2px -10px -10px; touch-action: none; }
+.match-drag-handle:active { cursor: grabbing; }
 .drag-item { cursor: grab; }
 .seq-row { display: flex; gap: 8px; align-items: stretch; }
 .seq-row .seq-item { flex: 1; }

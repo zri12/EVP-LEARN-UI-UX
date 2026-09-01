@@ -1290,6 +1290,8 @@ function Practice() {
   const [selectedLeft, setSelectedLeft] = useState<string | undefined>();
   const [pairs, setPairs] = useState<Record<string, string>>({});
   const [checked, setChecked] = useState(false);
+  const [draggedLeft, setDraggedLeft] = useState<string | undefined>();
+  const [dragOverRight, setDragOverRight] = useState<string | undefined>();
   const [activityScores, setActivityScores] = useState<ActivityResult[]>([]);
   const modulePractices = moduleContent(id).practices;
   const seqPractice = modulePractices.find(p => p.type === "sequence");
@@ -1363,15 +1365,22 @@ function Practice() {
     setChecked(false);
   }
 
-  function chooseRight(right: string) {
-    if (!selectedLeft || !matching) return;
+  function pairLeftWithRight(left: string, right: string) {
+    if (!matching) return;
     setPairs(current => {
-      const next = Object.fromEntries(Object.entries(current).filter(([left, pairedRight]) => left !== selectedLeft && pairedRight !== right));
-      next[selectedLeft] = right;
+      const next = Object.fromEntries(Object.entries(current).filter(([l, pairedRight]) => l !== left && pairedRight !== right));
+      next[left] = right;
       return next;
     });
     setSelectedLeft(undefined);
     setChecked(false);
+    setDraggedLeft(undefined);
+    setDragOverRight(undefined);
+  }
+
+  function chooseRight(right: string) {
+    if (!selectedLeft) return;
+    pairLeftWithRight(selectedLeft, right);
   }
 
   const canCheck = isSequence ? order.length > 0 : Boolean(matching && matching.left.every(left => pairs[left]));
@@ -1397,10 +1406,57 @@ function Practice() {
               return (
                 <button
                   key={left}
-                  className={["match-source", selectedLeft === left ? "selected" : "", correct ? "correct" : "", incorrect ? "incorrect" : ""].join(" ").trim()}
+                  className={["match-source", selectedLeft === left ? "selected" : "", draggedLeft === left ? "dragging" : "", correct ? "correct" : "", incorrect ? "incorrect" : ""].join(" ").trim()}
                   onClick={() => { setSelectedLeft(left); setChecked(false); }}
                   aria-pressed={selectedLeft === left}
+                  draggable
+                  onDragStart={(e) => {
+                    setDraggedLeft(left);
+                    setChecked(false);
+                    e.dataTransfer.effectAllowed = "move";
+                    e.dataTransfer.setData("text/plain", left);
+                  }}
+                  onDragEnd={() => {
+                    setDraggedLeft(undefined);
+                    setDragOverRight(undefined);
+                  }}
                 >
+                  <div
+                    className="drag-handle match-drag-handle"
+                    onPointerDown={(e) => {
+                      e.currentTarget.setPointerCapture(e.pointerId);
+                      setDraggedLeft(left);
+                      setChecked(false);
+                    }}
+                    onPointerMove={(e) => {
+                      if (draggedLeft !== left) return;
+                      e.preventDefault();
+                      const el = document.elementFromPoint(e.clientX, e.clientY);
+                      const targetEl = el?.closest("[data-match-target]");
+                      if (targetEl) {
+                        const rightVal = targetEl.getAttribute("data-match-target");
+                        if (rightVal && dragOverRight !== rightVal) setDragOverRight(rightVal);
+                      } else {
+                        if (dragOverRight !== undefined) setDragOverRight(undefined);
+                      }
+                    }}
+                    onPointerUp={(e) => {
+                      e.currentTarget.releasePointerCapture(e.pointerId);
+                      if (draggedLeft === left && dragOverRight) {
+                        pairLeftWithRight(left, dragOverRight);
+                      } else {
+                        setDraggedLeft(undefined);
+                        setDragOverRight(undefined);
+                      }
+                    }}
+                    onPointerCancel={(e) => {
+                      e.currentTarget.releasePointerCapture(e.pointerId);
+                      setDraggedLeft(undefined);
+                      setDragOverRight(undefined);
+                    }}
+                  >
+                    <GripVertical size={16} />
+                  </div>
                   <span><b>{left}</b>{paired && <small>{paired}</small>}</span>
                   {paired ? <Check size={17} /> : <ChevronRight size={17} />}
                 </button>
@@ -1412,10 +1468,27 @@ function Practice() {
             {matching.right.map(right => (
               <button
                 key={right}
-                className={`match-target${Object.values(pairs).includes(right) ? " paired" : ""}`}
+                className={`match-target${Object.values(pairs).includes(right) ? " paired" : ""}${dragOverRight === right ? " drag-over" : ""}`}
                 onClick={() => chooseRight(right)}
-                disabled={!selectedLeft}
                 aria-disabled={!selectedLeft}
+                data-match-target={right}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  if (draggedLeft) {
+                    e.dataTransfer.dropEffect = "move";
+                    if (dragOverRight !== right) setDragOverRight(right);
+                  }
+                }}
+                onDragLeave={() => {
+                  if (dragOverRight === right) setDragOverRight(undefined);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const leftData = e.dataTransfer.getData("text/plain");
+                  if (leftData && matching?.left.includes(leftData)) {
+                    pairLeftWithRight(leftData, right);
+                  }
+                }}
               >
                 <span>{right}</span>
               </button>
