@@ -376,13 +376,13 @@ function StateProvider({ children }: { children: React.ReactNode }) {
     
     mod.posttestResult = r;
     const pracScore = mod.practiceScore || 0;
-    const finalScore = Math.round((r.weighted + pracScore) * 10) / 10;
+    const finalScore = Math.min(100, Math.round((r.weighted + pracScore) * 10) / 10);
     const passed = finalScore >= PASSING_THRESHOLD;
     mod.finalScore = finalScore;
     mod.passed = passed;
     
-    // Learning gain calculated against baseline pretest
-    const pretestScore = mod.baselinePretest?.score ?? mod.pretestResult?.score ?? 0;
+    // Learning gain calculated against current attempt's pretest, not baseline
+    const pretestScore = mod.pretestResult?.score ?? 0;
     
     const attempt: ModuleAttempt = {
       id: `${id}-${Date.now()}`,
@@ -1319,11 +1319,11 @@ function Practice() {
     if (isSequence && practice.type === "sequence") {
       const total = practice.answer.length;
       const correct = practice.answer.filter((item, i) => order[i] === item).length;
-      return { score: total > 0 ? Math.round((correct / total) * 100) / 10 : 0, correct, total, completed: true };
+      return { score: total > 0 ? Math.round((correct / total) * 10) : 0, correct, total, completed: true };
     } else if (matching) {
       const total = matching.left.length;
       const correct = matching.left.filter(l => pairs[l] === matching.pairs[l]).length;
-      return { score: total > 0 ? Math.round((correct / total) * 100) / 10 : 0, correct, total, completed: true };
+      return { score: total > 0 ? Math.round((correct / total) * 10) : 0, correct, total, completed: true };
     }
     return { score: 0, correct: 0, total: 0, completed: false };
   }
