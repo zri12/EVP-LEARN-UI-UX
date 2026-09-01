@@ -1,13 +1,11 @@
 // ============================================================
 // EVP Learn — Academic Data Module
-// Source: Materi_Afrida_Revisi_Final_Siap_Aplikasi v1.0
-// Pre-test:  PROTOTYPE / Diagnostic — pending academic validation
-// Post-test: PROTOTYPE — pending final bank from source DOCX
+// Source: MATERI AFRIDA.docx (Canonical)
+// Pre-test: PROTOTYPE / DIAGNOSTIC
+// Post-test: PROTOTYPE (Derived strictly from MATERI AFRIDA.docx)
 // ============================================================
 
 export const PASSING_THRESHOLD = 75;
-// ↑ Centralized KKM/KKTP per PRD default (§19.3).
-//   Confirm final value with supervising researcher before production.
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -16,6 +14,7 @@ export type Question = {
   options: string[];
   answer: number; // 0-indexed correct option
   feedback?: string;
+  assessmentStatus?: "prototype" | "final"; // Internal marker
 };
 
 export type Word = {
@@ -48,7 +47,6 @@ export type Reading = {
   subtitle: string;
   visual: IllustrationKind;
   sections: { heading: string; body: string; highlights: string[] }[];
-  /** Interactive glossary for THIS reading — separate from vocabularyPreview. */
   glossary: Word[];
 };
 
@@ -65,54 +63,20 @@ export type Module = {
     structure: string[];
     features: string[];
   };
-  /** 5 preview words shown BEFORE reading. Separate from reading interactive glossary. */
   vocabularyPreview: Word[];
   readings: Reading[];
-  /** Diagnostic pre-test. Score does NOT affect final result. PROTOTYPE — validation pending. */
   pretest: Question[];
-  /** Post-test. Contributes max 70 pts (weighted). PROTOTYPE — awaiting DOCX final bank. */
   posttest: Question[];
   practices: Practice[];
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const q = (prompt: string, options: string[], answer = 0): Question => ({
-  prompt,
-  options,
-  answer,
-});
-
 const w = (word: string, pos: string, meaning: string): Word => ({ word, pos, meaning });
 
-/**
- * Prototype placeholder question bank.
- * PROTOTYPE — replace with finalized questions from DOCX when available.
- */
-const bank = (topic: string, answers: string[]): Question[] =>
-  [
-    "What is the main purpose of",
-    "Which statement is correct about",
-    "Which key concept appears in",
-    "What should a reader identify in",
-    "Which feature best supports",
-    "What is an important detail in",
-    "Which vocabulary is relevant to",
-    "Which generic structure is used in",
-    "What does the reading material explain about",
-    "Which conclusion is appropriate for",
-  ].map((stem) => q(`${stem} ${topic}?`, answers, 0));
-
-// ─── Glossary Helpers ─────────────────────────────────────────────────────────
-
-/** Map a reading's glossary to a lookup Record keyed by lowercase word. */
 export const readingGlossaryFor = (reading: Reading): Record<string, Word> =>
   Object.fromEntries(reading.glossary.map((item) => [item.word.toLowerCase(), item]));
 
-/**
- * @deprecated Use readingGlossaryFor(reading) for the active reading.
- * Kept for backward compatibility — merges all reading glossaries.
- */
 export const glossaryFor = (module: Module): Record<string, Word> =>
   Object.fromEntries(
     module.readings.flatMap((r) => r.glossary).map((item) => [item.word.toLowerCase(), item])
@@ -124,49 +88,43 @@ export const MODULES: Record<number, Module> = {
 
   // ══════════════════════════════════════════════════════════════════
   // MODULE 1 — NARRATIVE TEXT
-  // Reading: The Story of IKEA
-  // Chronology (revised-final): 1943 founding → early 1950s supplier
-  //   pressure → 1956 Kamprad + Gillis Lundgren flat-pack → global
   // ══════════════════════════════════════════════════════════════════
   1: {
     id: 1,
     title: "Narrative Text",
-    subtitle: "Inspirational Business & Brand Stories",
+    subtitle: "Inspirational Business Stories",
     accent: "#2563eb",
     tint: "#eff6ff",
     overview:
-      "Learn how an inspiring retail business story develops through a setting, challenge, creative solution, and meaningful outcome.",
+      "Narrative Text is a text that tells a story of connected events. In retail, it focuses on inspirational business origins, retail brand histories, and entrepreneurship challenges to entertain and inspire readers.",
     objectives: [
-      "Identify the purpose of a narrative text in a retail context.",
-      "Recognize Orientation, Complication, Resolution, and Re-orientation.",
-      "Find main ideas and details in the IKEA story.",
-      "Use narrative and retail vocabulary in context.",
+      "Mengidentifikasi fungsi sosial teks berkaitan retail.",
+      "Mengenali struktur generik dan ciri kebahasaan.",
+      "Memahami ide pokok dan informasi rinci.",
+      "Menggunakan kosakata retail dalam konteks bermakna.",
     ],
     theory: {
       definition:
-        "A narrative text tells a story of connected events. In retail, it presents inspirational business origins, brand histories, and entrepreneurship challenges to entertain and inspire readers.",
+        "Narrative Text is a text that tells a story of connected events. In retail, it focuses on inspirational business origins, retail brand histories, and entrepreneurship challenges to entertain and inspire readers.",
       structure: [
-        "Orientation — introduces the founder, setting, and starting time.",
-        "Complication — presents the main business problem or crisis.",
-        "Resolution — explains the creative solution.",
-        "Re-orientation — shows success and the moral lesson.",
+        "Orientation — Introduces the business founder, setting, and starting time.",
+        "Complication — Describes the main business problem, crisis, or challenge faced.",
+        "Resolution — Explains how the founder solved the problem creatively.",
+        "Re-orientation — Shows the final success and the moral lesson of the story.",
       ],
       features: [
-        "Simple Past Tense — founded, struggled, invented, launched.",
-        "Action Verbs — sold, built, shipped, produced.",
-        "Time Connectives — long ago, at first, suddenly, finally.",
+        "Simple Past Tense (e.g., founded, struggled, invented, launched).",
+        "Action Verbs (e.g., sold, built, shipped, produced).",
+        "Time Connectives (e.g., long ago, at first, suddenly, finally).",
       ],
     },
-
-    // ── Vocabulary Preview (5 words shown BEFORE reading) ───────────
     vocabularyPreview: [
-      w("Founder",      "noun", "Pendiri bisnis atau perusahaan."),
-      w("Venture",      "noun", "Usaha atau bisnis baru yang berisiko."),
-      w("Crisis",       "noun", "Krisis atau masalah besar."),
-      w("Breakthrough", "noun", "Inovasi atau penemuan penting."),
-      w("Retailer",     "noun", "Pengecer atau pengusaha ritel."),
+      w("Founder", "noun", "Pendiri bisnis."),
+      w("Venture", "noun", "Usaha/bisnis baru berrisiko."),
+      w("Crisis", "noun", "Krisis/masalah besar."),
+      w("Breakthrough", "noun", "Inovasi/penemuan penting."),
+      w("Retailer", "noun", "Pengecer."),
     ],
-
     readings: [
       {
         title: "THE STORY OF IKEA",
@@ -175,54 +133,204 @@ export const MODULES: Record<number, Module> = {
         sections: [
           {
             heading: "ORIENTATION",
-            body: "In 1943, a 17-year-old entrepreneur named Ingvar Kamprad founded a small mail-order business in Sweden. He named the company IKEA — combining his own initials (I.K.) with the first letters of Elmtaryd, the farm where he grew up, and Agunnaryd, the nearby village in southern Sweden. In its earliest years, IKEA sold small everyday items such as pens, wallets, and picture frames, before furniture was added to the catalogue a few years later.",
+            body: "Long ago in 1943, a 17-year-old boy named Ingvar Kamprad founded a small mail-order business in Sweden. He named it IKEA, using his initials (I.K.) plus the first letters of Elmtaryd and Agunnaryd, the farm and village where he grew up. At first, he sold small household items like pens, wallets, and picture frames.",
             highlights: [],
           },
           {
             heading: "COMPLICATION",
-            body: "By the early 1950s, IKEA had begun offering affordable furniture through its mail-order catalogue. This decision angered traditional Swedish furniture store owners, who pressured local suppliers to boycott IKEA and refuse it pre-assembled goods. Unable to source furniture from Swedish manufacturers, Kamprad had to look for alternatives abroad. The difficulty was made worse by the high cost of shipping bulky items. Oversized tables and sofas required enormous packaging, were expensive to arrange for delivery, and were frequently damaged in transit.",
-            highlights: ["affordable", "suppliers", "boycott", "delivery"],
+            body: "As IKEA grew and began selling affordable furniture, local traditional furniture store owners became furious. They pressured suppliers to BOYCOTT Kamprad, preventing him from receiving pre-assembled furniture. Furthermore, shipping large wooden tables and sofas was extremely EXPENSIVE and often resulted in damaged goods during DELIVERY. Kamprad faced a major crisis that threatened to close his growing business.",
+            highlights: ["boycott", "delivery"],
           },
           {
             heading: "RESOLUTION",
-            body: "In 1956, a creative solution emerged unexpectedly. While Ingvar Kamprad and his designer Gillis Lundgren were loading a table for shipment, Gillis suggested removing its legs so that it could fit into a flat, compact box. This idea became the foundation of the flat-pack concept: furniture sold in flat boxes that customers could carry home easily and assemble themselves. The innovation dramatically reduced transportation costs, decreased damage during transit, and made it possible to sell quality furniture at surprisingly low prices.",
-            highlights: ["flat-pack", "assemble"],
+            body: "Instead of giving up, Kamprad and his designer came up with a REVOLUTIONARY idea: \"FLAT-PACKING.\" They decided to disassemble a table by taking off its legs so it could fit into a flat box. Customers would buy the boxed furniture and ASSEMBLE it themselves at home. This innovation drastically reduced shipping costs, saved store warehouse space, and allowed IKEA to sell high-quality furniture at unbelievably low prices.",
+            highlights: ["revolutionary", "flat-packing", "assemble"],
           },
           {
             heading: "RE-ORIENTATION",
-            body: "Today, IKEA has grown into the world's most widely recognised furniture retailer, operating hundreds of stores across more than 60 countries. Its journey from a small Swedish mail-order business to a global brand demonstrates that creative problem-solving and a focus on practical customer needs can transform everyday challenges into lasting innovations that benefit millions of people worldwide.",
+            body: "Today, IKEA has grown into the world's largest furniture RETAILER with hundreds of stores worldwide. Ingvar Kamprad proved that facing business challenges with creativity and customer-focused solutions can turn a local struggle into a global success story.",
             highlights: ["retailer"],
           },
         ],
-        // Interactive glossary — separate from vocabularyPreview
         glossary: [
-          w("Boycott",   "verb/noun",   "Memboikot; menolak bekerja sama sebagai bentuk protes."),
-          w("Supplier",  "noun",        "Pemasok; pihak yang menyediakan barang atau bahan baku."),
-          w("Affordable","adjective",   "Terjangkau; harganya dapat dijangkau banyak orang."),
-          w("Delivery",  "noun",        "Pengiriman; proses mengantar barang kepada pelanggan."),
-          w("Flat-pack", "noun phrase", "Kemasan datar; produk dikemas tipis untuk dirakit sendiri."),
-          w("Assemble",  "verb",        "Merakit; menyusun bagian-bagian menjadi satu produk."),
-          w("Retailer",  "noun",        "Pengecer; penjual yang menjual langsung ke konsumen akhir."),
+          w("Boycott",       "verb",        "Memboikot / menolak kerja sama"),
+          w("Delivery",      "noun",        "Pengiriman barang"),
+          w("Revolutionary", "adjective",   "Sangat inovatif / mengubah keadaan"),
+          w("Flat-packing",  "noun phrase", "Pengemasan barang secara pipih/dUS"),
+          w("Assemble",      "verb",        "Merakit / menyusun bagian produk"),
+          w("Retailer",      "noun",        "Pengecer / pengusaha retail"),
         ],
       },
     ],
-
-    // PROTOTYPE — diagnostic pre-test, score excluded from final
-    pretest: bank("Narrative Text", [
-      "A narrative tells connected events",
-      "A descriptive text",
-      "A procedure text",
-      "A report",
-    ]),
-
-    // PROTOTYPE — awaiting final bank from Materi_Afrida_Revisi_Final_Siap_Aplikasi.docx
-    posttest: bank("IKEA Narrative", [
-      "Creative problem solving",
-      "A payment method",
-      "A product colour",
-      "A user account",
-    ]),
-
+    pretest: [
+      {
+        assessmentStatus: "prototype",
+        prompt: "What is the main purpose of Narrative Text in retail context?",
+        options: [
+          "To describe product specifications",
+          "To give step-by-step checkout instructions",
+          "To focus on inspirational business origins and brand histories",
+          "To complain about broken items"
+        ],
+        answer: 2,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "Which part of Narrative Text introduces the founder and setting?",
+        options: ["Orientation", "Complication", "Resolution", "Re-orientation"],
+        answer: 0,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "What does the 'Complication' section describe?",
+        options: [
+          "The final success of the story",
+          "The main business problem, crisis, or challenge",
+          "The time and place of the story",
+          "The step-by-step manual"
+        ],
+        answer: 1,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "What tense is commonly used in Narrative Text?",
+        options: ["Simple Present Tense", "Simple Future Tense", "Present Continuous Tense", "Simple Past Tense"],
+        answer: 3,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "The word 'founded' is an example of...",
+        options: ["Noun Phrase", "Simple Past Tense verb", "Time Connective", "Adjective"],
+        answer: 1,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "What does 'Founder' mean in Indonesian?",
+        options: ["Pendiri bisnis", "Pengecer", "Pembeli", "Karyawan toko"],
+        answer: 0,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "Which of the following is a Time Connective?",
+        options: ["Sold", "Long ago", "Retailer", "Venture"],
+        answer: 1,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "Where did Ingvar Kamprad grow up?",
+        options: ["America", "England", "Sweden", "Germany"],
+        answer: 2,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "What items did IKEA sell at first?",
+        options: ["Flat-pack sofas", "Large wooden tables", "Computers and phones", "Pens, wallets, and picture frames"],
+        answer: 3,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "What is the Indonesian meaning of 'Retailer'?",
+        options: ["Pabrik", "Grosir", "Pengecer", "Distributor"],
+        answer: 2,
+      },
+    ],
+    posttest: [
+      {
+        assessmentStatus: "prototype",
+        prompt: "According to the reading, when did Ingvar Kamprad found IKEA?",
+        options: ["1950", "1943", "1956", "1934"],
+        answer: 1,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "What complication did IKEA face as it began selling affordable furniture?",
+        options: [
+          "They ran out of materials to make pens",
+          "They could not find any customers in Sweden",
+          "Suppliers were pressured to boycott Kamprad",
+          "Customers did not know how to assemble tables"
+        ],
+        answer: 2,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "Why did Kamprad face a major crisis with shipping?",
+        options: [
+          "Large tables were expensive to ship and often damaged during delivery",
+          "Customers refused to pay for delivery",
+          "The mail-order system broke down",
+          "He could not find enough delivery drivers"
+        ],
+        answer: 0,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "What revolutionary idea did Kamprad and his designer invent?",
+        options: ["Online shopping", "Free home delivery", "Flat-packing", "Selling only picture frames"],
+        answer: 2,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "What did flat-packing allow customers to do?",
+        options: [
+          "Buy the boxed furniture and assemble it themselves at home",
+          "Order furniture over the telephone",
+          "Pay for furniture in monthly installments",
+          "Design their own furniture online"
+        ],
+        answer: 0,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "What was one major benefit of the flat-packing innovation for IKEA?",
+        options: [
+          "It made the furniture heavier",
+          "It drastically reduced shipping costs",
+          "It increased the store warehouse space needed",
+          "It made traditional store owners happy"
+        ],
+        answer: 1,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "In the Re-orientation paragraph, what has IKEA become today?",
+        options: [
+          "A small mail-order business",
+          "A local Swedish grocery store",
+          "The world's largest furniture retailer",
+          "A supplier of wood and paint"
+        ],
+        answer: 2,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "What does the word 'Assemble' mean?",
+        options: ["Mengirim barang", "Merakit / menyusun bagian produk", "Memboikot kerja sama", "Mengemas barang secara pipih"],
+        answer: 1,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "Which sentence uses the Simple Past Tense correctly?",
+        options: [
+          "Ingvar Kamprad founds a small business.",
+          "Ingvar Kamprad founded a small mail-order business.",
+          "Ingvar Kamprad is founding a small business.",
+          "Ingvar Kamprad will found a small business."
+        ],
+        answer: 1,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "Based on the text, what moral lesson can be learned from the IKEA story?",
+        options: [
+          "Creativity and customer-focused solutions can turn a struggle into global success",
+          "Never start a business when you are 17 years old",
+          "Always agree with traditional store owners",
+          "Furniture should always be pre-assembled by the seller"
+        ],
+        answer: 0,
+      },
+    ],
     practices: [
       {
         type: "match",
@@ -230,34 +338,34 @@ export const MODULES: Record<number, Module> = {
         instruction: "Match each narrative part with its purpose.",
         left: ["Orientation", "Complication", "Resolution", "Re-orientation"],
         right: [
-          "Shows the final success and lesson",
-          "Introduces the setting",
-          "Shows the solution",
-          "Shows the challenge",
+          "Shows the final success and the moral lesson",
+          "Introduces the business founder and setting",
+          "Explains how the founder solved the problem creatively",
+          "Describes the main business problem or crisis",
         ],
         pairs: {
-          "Orientation":    "Introduces the setting",
-          "Complication":   "Shows the challenge",
-          "Resolution":     "Shows the solution",
-          "Re-orientation": "Shows the final success and lesson",
+          "Orientation":    "Introduces the business founder and setting",
+          "Complication":   "Describes the main business problem or crisis",
+          "Resolution":     "Explains how the founder solved the problem creatively",
+          "Re-orientation": "Shows the final success and the moral lesson",
         },
       },
       {
         type: "tapMatch",
         title: "Vocabulary Match",
         instruction: "Match each word with its Indonesian meaning.",
-        left: ["Boycott", "Flat-pack", "Assemble", "Delivery"],
+        left: ["Boycott", "Flat-packing", "Assemble", "Delivery"],
         right: [
-          "Merakit",
+          "Merakit / menyusun bagian produk",
           "Pengiriman barang",
-          "Memboikot",
-          "Kemasan datar untuk dirakit sendiri",
+          "Memboikot / menolak kerja sama",
+          "Pengemasan barang secara pipih/dUS",
         ],
         pairs: {
-          "Boycott":   "Memboikot",
-          "Flat-pack": "Kemasan datar untuk dirakit sendiri",
-          "Assemble":  "Merakit",
-          "Delivery":  "Pengiriman barang",
+          "Boycott":      "Memboikot / menolak kerja sama",
+          "Flat-packing": "Pengemasan barang secara pipih/dUS",
+          "Assemble":     "Merakit / menyusun bagian produk",
+          "Delivery":     "Pengiriman barang",
         },
       },
       {
@@ -265,18 +373,18 @@ export const MODULES: Record<number, Module> = {
         title: "IKEA Event Sequence",
         instruction: "Arrange the IKEA story events from first to last.",
         items: [
-          "IKEA became a global retailer",
-          "IKEA began selling furniture",
-          "Flat-pack was developed",
-          "Ingvar founded IKEA",
-          "Suppliers boycotted IKEA",
+          "IKEA became the world's largest furniture retailer",
+          "IKEA began selling affordable furniture",
+          "Flat-packing was invented",
+          "Ingvar Kamprad founded a small mail-order business",
+          "Suppliers boycotted Kamprad",
         ],
         answer: [
-          "Ingvar founded IKEA",
-          "IKEA began selling furniture",
-          "Suppliers boycotted IKEA",
-          "Flat-pack was developed",
-          "IKEA became a global retailer",
+          "Ingvar Kamprad founded a small mail-order business",
+          "IKEA began selling affordable furniture",
+          "Suppliers boycotted Kamprad",
+          "Flat-packing was invented",
+          "IKEA became the world's largest furniture retailer",
         ],
       },
     ],
@@ -284,8 +392,6 @@ export const MODULES: Record<number, Module> = {
 
   // ══════════════════════════════════════════════════════════════════
   // MODULE 2 — DESCRIPTIVE TEXT
-  // Readings: POS Terminal · Gondola Shelving · Biker Jacket
-  // Jacket glossary: Genuine (not Premium) per revised-final source
   // ══════════════════════════════════════════════════════════════════
   2: {
     id: 2,
@@ -294,143 +400,242 @@ export const MODULES: Record<number, Module> = {
     accent: "#7c3aed",
     tint: "#f5f3ff",
     overview:
-      "Learn to describe retail products and store fixtures through identification, precise details, noun phrases, and adjectives.",
+      "Descriptive Text is a text that describes a specific object, place, or item in detail. In retail, it is used to describe merchandise specifications, store fixtures, and product selling points.",
     objectives: [
-      "Identify the purpose of a descriptive text.",
-      "Recognize Identification and Description.",
-      "Find product specifications and descriptive details.",
-      "Use retail adjectives and noun phrases in context.",
+      "Mengidentifikasi fungsi sosial teks berkaitan retail.",
+      "Mengenali struktur generik dan ciri kebahasaan.",
+      "Memahami ide pokok dan informasi rinci.",
+      "Menggunakan kosakata retail dalam konteks bermakna.",
     ],
     theory: {
       definition:
-        "A descriptive text describes a specific object, place, or item in detail. In retail, it describes merchandise specifications, store fixtures, and product selling points.",
+        "Descriptive Text is a text that describes a specific object, place, or item in detail. In retail, it is used to describe merchandise specifications, store fixtures, and product selling points.",
       structure: [
-        "Identification — introduces the product or fixture.",
-        "Description — details physical features, materials, size, colours, durability, and functions.",
+        "Identification — Introduces the retail product or store fixture being described.",
+        "Description — Details the physical features, materials, size, colors, durability, and functions of the item.",
       ],
       features: [
-        "Simple Present Tense — features, includes, measures, contains.",
-        "Adjectives — durable, sleek, ergonomic, sturdy.",
-        "Noun Phrases — heavy-duty shelving, dual-screen terminal.",
+        "Simple Present Tense (e.g., features, includes, measures, contains).",
+        "Adjectives of Quality & Appearance (e.g., durable, sleek, ergonomic, sturdy).",
+        "Noun Phrases (e.g., heavy-duty shelving, dual-screen terminal).",
       ],
     },
-
-    // ── Vocabulary Preview (5 words) ─────────────────────────────────
     vocabularyPreview: [
       w("Merchandise", "noun",      "Barang dagangan."),
-      w("Durable",     "adjective", "Tahan lama atau awet."),
-      w("Adjustable",  "adjective", "Dapat disesuaikan."),
-      w("Display",     "noun/verb", "Penataan atau pajangan barang."),
+      w("Durable",     "adjective", "Tahan lama / awet."),
+      w("Adjustable",  "adjective", "Dapat disesuaikan tingginya/ukurannya."),
+      w("Display",     "noun/verb", "Penataan/pajangan barang."),
       w("Sleek",       "adjective", "Halus, modern, dan elegan."),
     ],
-
     readings: [
-      // ── Submaterial 1: POS Terminal ──────────────────────────────
       {
         title: "Modern Touchscreen POS Terminal",
         subtitle: "Retail Hardware / POS System",
         visual: "pos",
         sections: [
           {
-            heading: "IDENTIFICATION",
-            body: "The OmniTouch 500 is a modern touchscreen POS terminal designed for fast-paced retail stores.",
-            highlights: [],
-          },
-          {
-            heading: "DESCRIPTION",
-            body: "It features a sleek black casing made of high-impact ABS plastic and a 15.6-inch dual-screen display that allows both cashiers and customers to view transactions simultaneously. At the top of the main unit, there is an integrated thermal receipt printer that operates quietly and at high speed. Supported by a sturdy metallic stand with a rust-resistant finish, this device ensures smooth checkout operations while maintaining an elegant aesthetic on the cashier counter.",
-            highlights: ["sleek", "casing", "dual-screen display", "integrated", "sturdy", "finish"],
+            heading: "IDENTIFICATION & DESCRIPTION",
+            body: "The OmniTouch 500 is a modern touchscreen POS terminal designed for fast-paced retail stores. It features a sleek black casing made of high-impact ABS plastic and a 15.6-inch dual-screen display that allows both cashiers and customers to view transactions simultaneously. At the top of the main unit, there is an integrated thermal receipt printer that operates quietly and at high speed. Supported by a sturdy metallic stand with a rust-resistant finish, this device ensures smooth checkout operations while maintaining an elegant aesthetic on the cashier counter.",
+            highlights: ["casing", "dual-screen display", "integrated", "sturdy", "finish"],
           },
         ],
         glossary: [
-          w("Sleek",               "adjective",   "Halus, modern, dan elegan."),
-          w("Casing",              "noun",        "Pelindung atau badan luar perangkat."),
-          w("Dual-screen display", "noun phrase", "Layar ganda untuk kasir dan pembeli."),
-          w("Integrated",          "adjective",   "Terintegrasi; tergabung dalam satu unit."),
-          w("Sturdy",              "adjective",   "Kokoh dan tidak mudah goyah."),
-          w("Finish",              "noun",        "Lapisan akhir pada permukaan produk."),
+          w("Casing",              "noun",        "Wadah / pelindung luar perangkat."),
+          w("Dual-screen display", "noun phrase", "Layar ganda (layar untuk kasir dan layar pembeli)."),
+          w("Integrated",          "adjective",   "Menyatu / terintegrasi menjadi satu unit."),
+          w("Sturdy",              "adjective",   "Kokoh / kuat / tidak mudah goyah."),
+          w("Finish",              "noun",        "Lapisan akhir permukaan bahan (misal: anti karat/matte)."),
         ],
       },
-
-      // ── Submaterial 2: Gondola Shelving ──────────────────────────
       {
         title: "Heavy-Duty Supermarket Gondola Shelving",
         subtitle: "Store Fixtures & Display",
         visual: "shelving",
         sections: [
           {
-            heading: "IDENTIFICATION",
-            body: "This heavy-duty gondola shelving unit is built specifically for organizing supermarket merchandise efficiently.",
-            highlights: ["gondola shelving", "merchandise"],
-          },
-          {
-            heading: "DESCRIPTION",
-            body: "Standing 2 meters tall, it consists of five adjustable steel shelves painted in a durable matte white powder coating. Each shelf is engineered to support up to 100 kilograms of goods, making it ideal for heavy food packaging and household cleaning items. Its open-front design provides high product visibility, allowing shoppers to easily locate and reach items while maximising aisle space.",
-            highlights: ["adjustable", "durable", "open-front", "visibility"],
+            heading: "IDENTIFICATION & DESCRIPTION",
+            body: "This heavy-duty gondola shelving unit is built specifically for organizing supermarket merchandise efficiently. Standing 2 meters tall, it consists of five adjustable steel shelves painted in a durable matte white powder coating. Each shelf is engineered to support up to 100 kilograms of goods, making it ideal for heavy food packaging and household cleaning items. Its open-front design provides high product visibility, allowing shoppers to easily locate and reach items while maximizing aisle space.",
+            highlights: ["gondola shelving", "adjustable", "durable", "open-front", "visibility"],
           },
         ],
         glossary: [
-          w("Gondola shelving", "noun phrase", "Rak gondola; rak display standar supermarket."),
-          w("Merchandise",      "noun",        "Barang dagangan."),
-          w("Adjustable",       "adjective",   "Dapat disesuaikan tinggi atau posisinya."),
-          w("Durable",          "adjective",   "Tahan lama; kuat dalam jangka panjang."),
-          w("Open-front",       "adjective",   "Terbuka pada bagian depan rak."),
+          w("Gondola shelving", "noun phrase", "Rak display dua sisi/satu sisi yang biasa digunakan di supermarket/minimarket."),
+          w("Adjustable",       "adjective",   "Dapat disesuaikan (ketinggian/posisinya)."),
+          w("Durable",          "adjective",   "Tahan lama / awet / tidak mudah rusak."),
+          w("Open-front",       "adjective",   "Berdesain terbuka bagian depan."),
           w("Visibility",       "noun",        "Tingkat keterlihatan produk oleh pelanggan."),
         ],
       },
-
-      // ── Submaterial 3: Biker Jacket (Genuine — not Premium) ──────
       {
         title: "Vintage Leather Biker Jacket",
         subtitle: "Fashion & Merchandise Display",
         visual: "jacket",
         sections: [
           {
-            heading: "IDENTIFICATION",
-            body: "The Urban Rider Jacket is a classic black biker-style leather jacket crafted for front-window retail display.",
-            highlights: [],
-          },
-          {
-            heading: "DESCRIPTION",
-            body: "Made from genuine cowhide leather, it features a smooth texture with a subtle natural shine. The jacket includes asymmetrical silver zippers, a snap-button collar, and an adjustable waist belt for a custom fit. Its bold design and high-quality craftsmanship make it an eye-catching centerpiece that attracts potential fashion shoppers into the store.",
-            highlights: ["genuine", "asymmetrical", "adjustable", "eye-catching", "centerpiece"],
+            heading: "IDENTIFICATION & DESCRIPTION",
+            body: "The Urban Rider Jacket is a classic black biker-style leather jacket crafted for front-window retail display. Made from premium genuine cowhide leather, it features a smooth texture with a subtle natural shine. The jacket includes asymmetrical silver zippers, a snap-button collar, and an adjustable waist belt for a custom fit. Its bold design and high-quality craftsmanship make it an eye-catching centerpiece that attracts potential fashion shoppers into the store.",
+            highlights: ["premium", "asymmetrical", "adjustable", "eye-catching", "centerpiece"],
           },
         ],
         glossary: [
-          w("Genuine",      "adjective", "Asli; terbuat dari bahan yang autentik."),
-          w("Asymmetrical", "adjective", "Tidak simetris; tidak sama kiri dan kanan."),
-          w("Adjustable",   "adjective", "Dapat disesuaikan ukurannya."),
-          w("Eye-catching", "adjective", "Menarik perhatian; mencolok secara visual."),
-          w("Centerpiece",  "noun",      "Produk utama yang menjadi pusat perhatian display."),
+          w("Premium",      "adjective", "Berkualitas tinggi / bermutu super."),
+          w("Asymmetrical", "adjective", "Tidak simetris (desain ritsleting miring khas jaket biker)."),
+          w("Adjustable",   "adjective", "Dapat diatur (ukuran lingkar pinggangnya)."),
+          w("Eye-catching", "adjective", "Menarik perhatian / mencolok untuk dilihat."),
+          w("Centerpiece",  "noun",      "Produk utama yang menjadi pusat perhatian tampilan display window toko."),
         ],
       },
     ],
-
-    pretest: bank("Descriptive Text", [
-      "Describe an object in detail",
-      "Tell a past story",
-      "Give steps",
-      "Debate an issue",
-    ]),
-
-    posttest: bank("Retail Products", [
-      "Simple Present Tense",
-      "Only past tense",
-      "No adjectives",
-      "Imperatives only",
-    ]),
-
+    pretest: [
+      {
+        assessmentStatus: "prototype",
+        prompt: "What is the primary function of Descriptive Text?",
+        options: [
+          "To tell a story from the past",
+          "To give step-by-step instructions",
+          "To describe a specific object, place, or item in detail",
+          "To persuade customers to buy a product"
+        ],
+        answer: 2,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "Which part of Descriptive Text introduces the product being described?",
+        options: ["Description", "Resolution", "Identification", "Orientation"],
+        answer: 2,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "The 'Description' section of the text usually details...",
+        options: [
+          "The step-by-step procedure",
+          "The physical features, materials, size, and colors",
+          "The company's history",
+          "The moral value of the product"
+        ],
+        answer: 1,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "What tense is used in Descriptive Text?",
+        options: ["Simple Past Tense", "Simple Future Tense", "Present Perfect Tense", "Simple Present Tense"],
+        answer: 3,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "Which of the following is an Adjective of Quality & Appearance?",
+        options: ["Shelving", "Terminal", "Sleek", "Cashier"],
+        answer: 2,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "What does the word 'Merchandise' mean in Indonesian?",
+        options: ["Rak toko", "Barang dagangan", "Kasir", "Mesin EDC"],
+        answer: 1,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "The phrase 'heavy-duty shelving' is an example of...",
+        options: ["A Verb Phrase", "An Adverb", "A Noun Phrase", "A Preposition"],
+        answer: 2,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "What does 'Durable' mean?",
+        options: ["Mudah rusak", "Halus dan elegan", "Tahan lama / awet", "Sangat murah"],
+        answer: 2,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "Which of the following describes the POS Terminal's casing?",
+        options: ["Made of wood", "Sleek black casing made of ABS plastic", "Painted in white powder coating", "Made from genuine cowhide leather"],
+        answer: 1,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "Which word means 'Penataan/pajangan barang'?",
+        options: ["Sleek", "Adjustable", "Display", "Merchandise"],
+        answer: 2,
+      },
+    ],
+    posttest: [
+      {
+        assessmentStatus: "prototype",
+        prompt: "What is the OmniTouch 500 designed for?",
+        options: ["Making coffee", "Fast-paced retail stores", "Organizing heavy food packaging", "Front-window fashion display"],
+        answer: 1,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "What allows both cashiers and customers to view transactions on the POS terminal?",
+        options: ["A thermal receipt printer", "A sturdy metallic stand", "A 15.6-inch dual-screen display", "A sleek black casing"],
+        answer: 2,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "What does the word 'Integrated' mean in the context of the POS terminal?",
+        options: ["Menyatu / terintegrasi menjadi satu unit", "Berdesain terbuka bagian depan", "Kokoh / kuat / tidak mudah goyah", "Layar ganda"],
+        answer: 0,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "How tall is the Heavy-Duty Supermarket Gondola Shelving?",
+        options: ["1 meter tall", "2 meters tall", "3 meters tall", "5 meters tall"],
+        answer: 1,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "How much weight is each shelf of the Gondola Shelving engineered to support?",
+        options: ["Up to 10 kilograms", "Up to 50 kilograms", "Up to 100 kilograms", "Up to 200 kilograms"],
+        answer: 2,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "What is the benefit of the 'open-front design' of the shelving unit?",
+        options: [
+          "It hides the products from view",
+          "It provides high product visibility",
+          "It makes the shelf lighter",
+          "It prints thermal receipts quickly"
+        ],
+        answer: 1,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "What material is the Urban Rider Jacket made from?",
+        options: ["ABS plastic", "Matte white powder coating", "Premium genuine cowhide leather", "Steel shelves"],
+        answer: 2,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "Which feature of the jacket provides a 'custom fit'?",
+        options: ["Asymmetrical silver zippers", "Snap-button collar", "Quilted inner lining", "Adjustable waist belt"],
+        answer: 3,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "What does 'Eye-catching' mean in Indonesian?",
+        options: ["Produk utama", "Menarik perhatian / mencolok untuk dilihat", "Berkualitas tinggi", "Tidak simetris"],
+        answer: 1,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "The phrase 'smooth texture with a subtle natural shine' is an example of...",
+        options: ["Identification", "Description", "Orientation", "Complication"],
+        answer: 1,
+      },
+    ],
     practices: [
       {
         type: "match",
         title: "Product Feature Match",
         instruction: "Match each feature with the correct retail product.",
         left: ["Dual-screen display", "Adjustable steel shelves", "Asymmetrical silver zippers"],
-        right: ["Biker Jacket", "POS Terminal", "Gondola Shelving"],
+        right: ["Vintage Leather Biker Jacket", "Modern Touchscreen POS Terminal", "Heavy-Duty Gondola Shelving"],
         pairs: {
-          "Dual-screen display":         "POS Terminal",
-          "Adjustable steel shelves":    "Gondola Shelving",
-          "Asymmetrical silver zippers": "Biker Jacket",
+          "Dual-screen display":         "Modern Touchscreen POS Terminal",
+          "Adjustable steel shelves":    "Heavy-Duty Gondola Shelving",
+          "Asymmetrical silver zippers": "Vintage Leather Biker Jacket",
         },
       },
       {
@@ -438,10 +643,10 @@ export const MODULES: Record<number, Module> = {
         title: "Descriptive Vocabulary",
         instruction: "Match each word with its Indonesian meaning.",
         left: ["Durable", "Sturdy", "Eye-catching"],
-        right: ["Kokoh", "Tahan lama", "Menarik perhatian"],
+        right: ["Kokoh / kuat", "Tahan lama / awet", "Menarik perhatian"],
         pairs: {
-          "Durable":      "Tahan lama",
-          "Sturdy":       "Kokoh",
+          "Durable":      "Tahan lama / awet",
+          "Sturdy":       "Kokoh / kuat",
           "Eye-catching": "Menarik perhatian",
         },
       },
@@ -450,19 +655,19 @@ export const MODULES: Record<number, Module> = {
         title: "Text Structure Sort",
         instruction: "Classify each sentence as Identification or Description.",
         left: [
-          "The OmniTouch 500 is a POS terminal.",
-          "It has a dual-screen display.",
-          "The Urban Rider Jacket is a biker jacket.",
+          "The OmniTouch 500 is a modern touchscreen POS terminal.",
+          "It features a sleek black casing made of ABS plastic.",
+          "The Urban Rider Jacket is a classic black biker-style leather jacket.",
         ],
         right: [
-          "Description — product feature",
+          "Description — physical features",
           "Identification — POS",
           "Identification — jacket",
         ],
         pairs: {
-          "The OmniTouch 500 is a POS terminal.":    "Identification — POS",
-          "It has a dual-screen display.":            "Description — product feature",
-          "The Urban Rider Jacket is a biker jacket.":"Identification — jacket",
+          "The OmniTouch 500 is a modern touchscreen POS terminal.":    "Identification — POS",
+          "It features a sleek black casing made of ABS plastic.":      "Description — physical features",
+          "The Urban Rider Jacket is a classic black biker-style leather jacket.":"Identification — jacket",
         },
       },
     ],
@@ -470,11 +675,6 @@ export const MODULES: Record<number, Module> = {
 
   // ══════════════════════════════════════════════════════════════════
   // MODULE 3 — PROCEDURE TEXT
-  // Reading: Customer Checkout SOP
-  // Vocabulary Preview : Scan, Receipt, Checkout, Verify, Cash drawer
-  // Interactive Glossary: Greet, Scan, Verify, Payment method,
-  //   Enter, Change, Receipt, Hand over
-  // NOTE: Cash drawer is Preview ONLY — not a reading glossary target
   // ══════════════════════════════════════════════════════════════════
   3: {
     id: 3,
@@ -483,37 +683,34 @@ export const MODULES: Record<number, Module> = {
     accent: "#0f766e",
     tint: "#f0fdfa",
     overview:
-      "Learn how a clear store procedure guides a customer checkout accurately, efficiently, and politely.",
+      "Procedure Text is a text that gives step-by-step instructions to achieve a specific goal. In retail, it covers store Standard Operating Procedures (SOPs), cash handling, merchandise display rules, and return processing.",
     objectives: [
-      "Identify the purpose of a procedure text.",
-      "Recognize Goal, Materials, and Steps.",
-      "Understand the checkout sequence.",
-      "Use imperative verbs and sequence adverbs.",
+      "Mengidentifikasi fungsi sosial teks berkaitan retail.",
+      "Mengenali struktur generik dan ciri kebahasaan.",
+      "Memahami ide pokok dan informasi rinci.",
+      "Menggunakan kosakata retail dalam konteks bermakna.",
     ],
     theory: {
       definition:
-        "A procedure text gives step-by-step instructions to achieve a specific goal. In retail, it covers store SOPs, cash handling, merchandise display rules, and return processing.",
+        "Procedure Text is a text that gives step-by-step instructions to achieve a specific goal. In retail, it covers store Standard Operating Procedures (SOPs), cash handling, merchandise display rules, and return processing.",
       structure: [
-        "Goal / Aim — states what is to be achieved.",
-        "Materials / Equipment — lists the tools needed.",
-        "Steps / Methods — gives sequential instructions.",
+        "Goal / Aim — States what is going to be achieved or done.",
+        "Materials / Equipment — Lists tools or items needed to complete the steps.",
+        "Steps / Methods — Sequential instructions on how to do the process.",
       ],
       features: [
-        "Imperative Sentences — greet, scan, press, verify, print.",
-        "Sequence Adverbs — First, Next, Then, After that, Finally.",
-        "Clear & Precise Directives — scan the barcode carefully.",
+        "Imperative Sentences / Action Verbs (e.g., greet, scan, press, verify, print).",
+        "Sequence Adverbs (e.g., First, Next, Then, After that, Finally).",
+        "Clear & Precise Directives (e.g., scan the barcode carefully).",
       ],
     },
-
-    // ── Vocabulary Preview (5 words) ─────────────────────────────────
     vocabularyPreview: [
-      w("Scan",        "verb",        "Memindai barcode produk."),
-      w("Receipt",     "noun",        "Struk belanja atau bukti pembayaran."),
-      w("Checkout",    "noun",        "Area atau proses pembayaran kasir."),
-      w("Verify",      "verb",        "Memeriksa atau memastikan kebenaran data."),
-      w("Cash drawer", "noun phrase", "Laci uang kasir."),
+      w("Scan",        "verb", "Memindai (barcode)."),
+      w("Receipt",     "noun", "Struk belanja/bukti pembayaran."),
+      w("Checkout",    "noun", "Area/proses pembayaran kasir."),
+      w("Verify",      "verb", "Memeriksa/memastikan kebenaran data."),
+      w("Cash Drawer", "noun", "Laci uang kasir."),
     ],
-
     readings: [
       {
         title: "HOW TO PROCESS CUSTOMER CHECKOUT USING A POS TERMINAL",
@@ -528,74 +725,220 @@ export const MODULES: Record<number, Module> = {
           {
             heading: "MATERIALS / EQUIPMENT",
             body: "1. POS Terminal & Cash Drawer\n2. Barcode Scanner\n3. Thermal Receipt Paper\n4. Customer's Merchandise",
-            highlights: ["receipt"],
+            highlights: [],
           },
           {
             heading: "STEPS / PROCEDURES",
-            body: "1. FIRST, GREET the customer warmly and ask if they found everything they needed.\n\n2. NEXT, SCAN each item's barcode using the hand-held scanner. Ensure the scanner beeps to confirm the item is registered on the system screen.\n\n3. THEN, VERIFY the quantity and price of the merchandise displayed on the dual-screen monitor.\n\n4. AFTER THAT, ASK the customer for their preferred PAYMENT METHOD: cash, credit card, or QRIS digital payment.\n\n5. IF paying cash, INSERT the money into the cash drawer and ENTER the amount into the terminal to calculate change automatically.\n\n6. FINALLY, PRINT the receipt, attach it to the shopping bag, and HAND over the items with a warm closing phrase: \"Thank you for shopping with us!\"",
-            highlights: ["greet", "scan", "verify", "payment method", "enter", "change", "receipt", "hand over"],
+            body: "1. FIRST, GREET the customer warmly and ask if they found everything they needed.\n\n2. NEXT, SCAN each item's barcode using the hand-held scanner. Ensure the scanner BEEPS to confirm the item is registered on the system screen.\n\n3. THEN, VERIFY the quantity and price of the merchandise displayed on the dual-screen monitor.\n\n4. AFTER THAT, ASK the customer for their preferred PAYMENT METHOD (cash, credit card, or QRIS digital payment).\n\n5. IF paying cash, INSERT the money into the cash drawer and ENTER the amount into the terminal to calculate change automatically.\n\n6. FINALLY, PRINT the receipt, ATTACH it to the shopping bag, and HAND over the items with a warm closing phrase like \"Thank you for shopping with us!\"",
+            highlights: ["greet", "scan", "verify", "payment method", "insert", "attach"],
           },
         ],
-        // Cash drawer is Preview — NOT included in interactive glossary
         glossary: [
-          w("Greet",          "imperative verb", "Menyapa; mengucapkan salam kepada pelanggan."),
-          w("Scan",           "verb",            "Memindai; membaca kode barcode produk."),
-          w("Verify",         "verb",            "Memeriksa; memastikan kebenaran data."),
-          w("Payment method", "noun phrase",     "Metode pembayaran yang dipilih pelanggan."),
-          w("Enter",          "imperative verb", "Memasukkan; menginput jumlah uang ke sistem."),
-          w("Change",         "noun",            "Kembalian; uang sisa yang dikembalikan ke pelanggan."),
-          w("Receipt",        "noun",            "Struk belanja; bukti pembayaran resmi."),
-          w("Hand over",      "verb phrase",     "Menyerahkan; memberikan barang kepada pelanggan."),
+          w("Greet",          "verb (imperative)", "Menyapa"),
+          w("Scan",           "verb (imperative)", "Memindai (barcode)"),
+          w("Verify",         "verb (imperative)", "Memeriksa / memverifikasi"),
+          w("Payment method", "noun phrase",       "Metode / cara pembayaran"),
+          w("Insert",         "verb (imperative)", "Memasukkan"),
+          w("Attach",         "verb (imperative)", "Melampirkan / menempelkan"),
         ],
       },
     ],
-
-    pretest: bank("Procedure Text", [
-      "Give step-by-step instructions",
-      "Tell a story",
-      "Describe a jacket",
-      "Compare scores",
-    ]),
-
-    posttest: bank("Customer Checkout", [
-      "Clear and ordered steps",
-      "A random story",
-      "A product description",
-      "A user profile",
-    ]),
-
+    pretest: [
+      {
+        assessmentStatus: "prototype",
+        prompt: "What is a Procedure Text?",
+        options: [
+          "A text that tells a fictional story",
+          "A text that gives step-by-step instructions to achieve a goal",
+          "A text that describes a product's physical features",
+          "A text that debates an issue"
+        ],
+        answer: 1,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "Which section lists the tools needed to complete the steps?",
+        options: ["Goal / Aim", "Steps / Methods", "Materials / Equipment", "Orientation"],
+        answer: 2,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "Which of the following is a Sequence Adverb?",
+        options: ["Finally", "Scan", "Receipt", "Cash Drawer"],
+        answer: 0,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "An Imperative Sentence usually begins with...",
+        options: ["A Noun", "An Adjective", "An Action Verb", "A Sequence Adverb"],
+        answer: 2,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "What does 'Verify' mean?",
+        options: ["Menyapa", "Memindai (barcode)", "Melampirkan", "Memeriksa/memastikan kebenaran data"],
+        answer: 3,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "What is the Indonesian term for 'Receipt'?",
+        options: ["Laci uang", "Area kasir", "Struk belanja/bukti pembayaran", "Memindai barcode"],
+        answer: 2,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "Which is an example of a clear and precise directive?",
+        options: ["Scan the barcode carefully", "It is very durable", "Long ago in 1943", "The jacket is black"],
+        answer: 0,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "Where does a procedure text usually state what is going to be achieved?",
+        options: ["In the Steps section", "In the Goal/Aim section", "In the Materials section", "At the very end of the text"],
+        answer: 1,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "What is a 'Cash Drawer'?",
+        options: ["Kertas termal", "Pemindai kode", "Laci uang kasir", "Keranjang belanja"],
+        answer: 2,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "Which of the following is NOT part of the Generic Structure of a Procedure Text?",
+        options: ["Goal / Aim", "Complication", "Materials / Equipment", "Steps / Methods"],
+        answer: 1,
+      },
+    ],
+    posttest: [
+      {
+        assessmentStatus: "prototype",
+        prompt: "What is the Goal/Aim of the provided procedure text?",
+        options: [
+          "To assemble flat-packing furniture at home",
+          "To complete a retail sales transaction efficiently and accurately using a POS terminal",
+          "To display vintage leather jackets in the front window",
+          "To organize supermarket merchandise efficiently"
+        ],
+        answer: 1,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "Which of the following is NOT listed as Materials/Equipment in the text?",
+        options: ["POS Terminal & Cash Drawer", "Barcode Scanner", "Shopping Trolley", "Thermal Receipt Paper"],
+        answer: 2,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "According to the procedure, what should the cashier do FIRST?",
+        options: ["Scan the barcode", "Greet the customer warmly", "Verify the quantity and price", "Ask for the payment method"],
+        answer: 1,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "How does the cashier ensure the item is registered on the system screen after scanning?",
+        options: [
+          "By printing the receipt",
+          "By inserting the money",
+          "By ensuring the scanner BEEPS",
+          "By greeting the customer"
+        ],
+        answer: 2,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "What must the cashier do THEN, after scanning the barcodes?",
+        options: [
+          "Verify the quantity and price of the merchandise displayed",
+          "Attach the receipt to the shopping bag",
+          "Calculate the change automatically",
+          "Ask if they found everything they needed"
+        ],
+        answer: 0,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "Which payment methods can the cashier ask the customer for?",
+        options: [
+          "Cash, credit card, or QRIS digital payment",
+          "Only cash",
+          "Only credit card",
+          "Gold and silver"
+        ],
+        answer: 0,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "What happens IF the customer is paying with cash?",
+        options: [
+          "The cashier inserts the money into the cash drawer and enters the amount into the terminal",
+          "The terminal prints the receipt immediately",
+          "The cashier asks them to use a credit card instead",
+          "The cashier taps the cash on the EDC machine"
+        ],
+        answer: 0,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "What is the Indonesian meaning of the imperative verb 'Attach'?",
+        options: ["Menyapa", "Memasukkan", "Melampirkan / menempelkan", "Memeriksa"],
+        answer: 2,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "What is the FINALLY step in the checkout procedure?",
+        options: [
+          "Ask if they found everything they needed",
+          "Print the receipt, attach it to the shopping bag, and hand over the items",
+          "Verify the quantity and price on the dual-screen monitor",
+          "Ensure the scanner beeps"
+        ],
+        answer: 1,
+      },
+      {
+        assessmentStatus: "prototype",
+        prompt: "What warm closing phrase is suggested when handing over the items?",
+        options: [
+          "Please come back tomorrow!",
+          "Thank you for shopping with us!",
+          "Don't forget your receipt!",
+          "Have a nice flight!"
+        ],
+        answer: 1,
+      },
+    ],
     practices: [
       {
         type: "sequence",
         title: "Checkout Sequencing",
         instruction: "Arrange the checkout steps in the correct order.",
         items: [
-          "Print the receipt and hand over items",
-          "Verify price and quantity",
-          "Scan each barcode",
-          "Greet the customer",
-          "Ask the payment method",
-          "Process the payment",
+          "Print the receipt and attach it to the bag",
+          "Verify the quantity and price",
+          "Scan each item's barcode",
+          "Greet the customer warmly",
+          "Ask for the preferred payment method",
+          "Insert money and enter the amount",
         ],
         answer: [
-          "Greet the customer",
-          "Scan each barcode",
-          "Verify price and quantity",
-          "Ask the payment method",
-          "Process the payment",
-          "Print the receipt and hand over items",
+          "Greet the customer warmly",
+          "Scan each item's barcode",
+          "Verify the quantity and price",
+          "Ask for the preferred payment method",
+          "Insert money and enter the amount",
+          "Print the receipt and attach it to the bag",
         ],
       },
       {
         type: "match",
         title: "Equipment Match",
         instruction: "Match each retail tool with its use.",
-        left: ["Barcode scanner", "Receipt printer", "Cash drawer"],
-        right: ["Store cash", "Read barcode", "Print receipt"],
+        left: ["Barcode Scanner", "Thermal Receipt Paper", "POS Terminal"],
+        right: ["To calculate transactions", "To scan items", "To print proof of payment"],
         pairs: {
-          "Barcode scanner": "Read barcode",
-          "Receipt printer": "Print receipt",
-          "Cash drawer":     "Store cash",
+          "Barcode Scanner": "To scan items",
+          "Thermal Receipt Paper": "To print proof of payment",
+          "POS Terminal": "To calculate transactions",
         },
       },
       {

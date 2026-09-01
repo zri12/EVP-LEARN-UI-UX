@@ -34,6 +34,7 @@ type ModuleAttempt = {
 type ModState = {
   pct: number; section: string; lastRoute: string;
   pretestResult?: PretestData;
+  baselinePretest?: PretestData; // Preserves first attempt
   practiceActivities: ActivityResult[];
   practiceScore: number;
   posttestResult?: PosttestData;
@@ -346,7 +347,12 @@ function StateProvider({ children }: { children: React.ReactNode }) {
 
   function savePretestResult(id: number, r: PretestData) {
     const next = { ...gs, mods: { ...gs.mods } };
-    next.mods[id] = { ...next.mods[id], pretestResult: r };
+    const mod = { ...next.mods[id] };
+    mod.pretestResult = r;
+    if (!mod.baselinePretest) {
+      mod.baselinePretest = r;
+    }
+    next.mods[id] = mod;
     persist(next);
   }
 
@@ -364,13 +370,20 @@ function StateProvider({ children }: { children: React.ReactNode }) {
   function finalizePosttest(id: number, r: PosttestData) {
     const next = { ...gs, mods: { ...gs.mods } };
     const mod = { ...next.mods[id] };
+    
+    // Idempotency: prevent StrictMode/refresh from duplicating attempts
+    if (mod.posttestResult) return;
+    
     mod.posttestResult = r;
     const pracScore = mod.practiceScore || 0;
     const finalScore = Math.round((r.weighted + pracScore) * 10) / 10;
     const passed = finalScore >= PASSING_THRESHOLD;
     mod.finalScore = finalScore;
     mod.passed = passed;
-    const pretestScore = mod.pretestResult?.score ?? 0;
+    
+    // Learning gain calculated against baseline pretest
+    const pretestScore = mod.baselinePretest?.score ?? mod.pretestResult?.score ?? 0;
+    
     const attempt: ModuleAttempt = {
       id: `${id}-${Date.now()}`,
       timestamp: new Date().toISOString(),
@@ -946,43 +959,10 @@ function Theory() {
   };
 
   const lessonExtra = ({
-    1: {
-      art: narrativeLessonArt,
-      artAlt: "Visual story of a retail entrepreneur solving a delivery challenge.",
-      overview: [
-        "Narrative texts normally move forward in time. Readers first understand who is involved and where the events happen, then they follow a problem until it is solved.",
-        "In a business story, the conflict may be a shortage of supplies, high delivery costs, changing customer needs, or competition. The resolution explains the decision or innovation that changes the situation.",
-      ],
-      contextTitle: "Penerapan dalam Dunia Retail",
-      context: "Brand stories help businesses build an emotional connection with customers. A story about a founder, an early challenge, or a product innovation can make a retail brand feel memorable and trustworthy.",
-      exampleTitle: "Contoh Singkat",
-      example: "In 1943, Ingvar started a small business in Sweden. When delivery became expensive, he introduced flat-pack furniture. As a result, customers could carry products home more easily.",
-    },
-    2: {
-      art: descriptiveLessonArt,
-      artAlt: "Retail point-of-sale terminal, product shelves, and a product detail display.",
-      overview: [
-        "The identification section names the subject and gives a general category. It answers the question: What exactly is being described? The description section then gives organized details about appearance, parts, quality, materials, and function.",
-        "A useful product description is precise rather than vague. Instead of saying a shelf is good, a writer can say that it has adjustable steel shelves, a durable coating, and an open-front design for better visibility.",
-      ],
-      contextTitle: "Penerapan dalam Dunia Retail",
-      context: "Retail staff use descriptive text in catalogues, product labels, online listings, sales presentations, and store-fixture guides. Accurate details help customers compare products and make confident decisions.",
-      exampleTitle: "Contoh Singkat",
-      example: "The touchscreen POS terminal is a compact retail device with a dual-screen display. Its sturdy aluminum casing, integrated scanner, and receipt printer support efficient daily transactions.",
-    },
-    3: {
-      art: procedureLessonArt,
-      artAlt: "Retail cashier processing a customer checkout step by step.",
-      overview: [
-        "A strong procedure follows a logical order, because readers need to know what to do first, what to prepare, and what to check before moving to the next step.",
-        "In retail, a clear procedure protects both customers and staff. It reduces mistakes in payments, product scanning, stock handling, and service standards while ensuring the same quality of service each time.",
-      ],
-      contextTitle: "Penerapan dalam Dunia Retail",
-      context: "Store SOPs are written as procedure texts. They can explain how to open a register, handle a return, restock a shelf, process a cashless payment, or respond to a customer question.",
-      exampleTitle: "Contoh Singkat",
-      example: "First, greet the customer. Next, scan every barcode and verify the total on the POS screen. Then process the payment, print the receipt, and hand over the bag politely.",
-    },
-  } as const)[id] || ({ art: narrativeLessonArt, artAlt: "Retail learning illustration.", overview: [], contextTitle: "Konteks", context: "", exampleTitle: "Contoh", example: "" } as const);
+    1: { art: narrativeLessonArt, artAlt: "Visual story of a retail entrepreneur." },
+    2: { art: descriptiveLessonArt, artAlt: "Retail point-of-sale terminal and products." },
+    3: { art: procedureLessonArt, artAlt: "Retail cashier processing a customer checkout." },
+  } as const)[id] || { art: narrativeLessonArt, artAlt: "Retail learning illustration." };
 
   return (
     <Shell title={t.learningMaterial}>
@@ -998,8 +978,6 @@ function Theory() {
         <h2>{c.defTitle}</h2>
         <p className="theory-sub">{c.defSub}</p>
         <p>{lesson.definition}</p>
-        <p className="theory-purpose">{lesson.purpose}</p>
-        {lessonExtra.overview.map(paragraph => <p key={paragraph}>{paragraph}</p>)}
       </section>
       <section>
         <h2>{c.structTitle}</h2>
@@ -1014,15 +992,6 @@ function Theory() {
         <h2>{c.featTitle}</h2>
         <p className="theory-sub">{c.featSub}</p>
         <div className="feature-list">{c.features.map((x, i) => <article key={x}><b>{x}</b><p>{lesson.features[i]}</p></article>)}</div>
-      </section>
-      <section className="theory-section lesson-context">
-        <h2>{lang === "id" ? lessonExtra.contextTitle : "Retail Application"}</h2>
-        <p>{lessonExtra.context}</p>
-      </section>
-      <section className="lesson-example">
-        <span>{lang === "id" ? "CONTOH BAHASA INGGRIS" : "ENGLISH EXAMPLE"}</span>
-        <h2>{lang === "id" ? lessonExtra.exampleTitle : "Short Example"}</h2>
-        <p>{lessonExtra.example}</p>
       </section>
       <Button onClick={() => {
         updateModPct(id, 35, t.vocabPreview, `/module/${id}/vocabulary`);
