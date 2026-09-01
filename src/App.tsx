@@ -606,10 +606,10 @@ function HomePage() {
         <h2>{t.yourModules}</h2>
         <button className="text-link" onClick={() => nav("/modules")}>{t.seeAll}</button>
       </section>
-      <div className="module-preview">
+      <div className="module-slider">
         {modules.map(mod => {
           const prog = mods[mod.id]?.pct ?? 0;
-          return <MiniModule key={mod.id} m={mod} onClick={() => nav(`/module/${mod.id}`)} progress={prog} t={t} />;
+          return <SliderCard key={mod.id} m={mod} onClick={() => nav(`/module/${mod.id}`)} progress={prog} t={t} />;
         })}
       </div>
 
@@ -633,13 +633,26 @@ function Quick2({ icon: I, label, onClick }: { icon: React.ElementType; label: s
   );
 }
 
-function MiniModule({ m, onClick, progress, t }: { m: ModuleUI; onClick: () => void; progress: number; t: typeof T.id }) {
+function SliderCard({ m, onClick, progress, t }: { m: ModuleUI; onClick: () => void; progress: number; t: typeof T.id }) {
   const I = m.icon;
   return (
-    <button className="mini-module" onClick={onClick}>
-      <div style={{ background: m.tint, color: m.accent }}><I size={20} /></div>
-      <span><b>Module 0{m.id}</b><small>{m.title}</small></span>
-      {progress > 0 ? <em style={{ color: m.accent }}>{progress}%</em> : <ChevronRight size={18} />}
+    <button className="slider-card" onClick={onClick}>
+      <div className="slider-card-top">
+        <div className="slider-card-icon" style={{ background: m.tint, color: m.accent }}>
+          <I size={24} />
+        </div>
+        {progress > 0 && <span className="slider-card-progress">{progress}%</span>}
+      </div>
+      <div>
+        <h3>Module 0{m.id}</h3>
+        <p>{m.title}</p>
+      </div>
+      <div className="slider-card-footer">
+        <span>{t.exploreModules}</span>
+        <div className="play-btn">
+          <Play size={16} fill="currentColor" style={{ marginLeft: 2 }} />
+        </div>
+      </div>
     </button>
   );
 }
