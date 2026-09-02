@@ -1734,13 +1734,13 @@ function ProfilePage() {
   const { t } = useLang();
   const f = t.profileFields;
   const rows: [string, string][] = [
-    [f.nama, "— (data peneliti)"],
-    [f.nim, "— (NIM peneliti)"],
-    [f.prodi, "Pendidikan Bahasa Inggris"],
-    [f.fakultas, "— (data peneliti)"],
-    [f.universitas, "— (data peneliti)"],
-    [f.pembimbing, "— (data peneliti)"],
-    [f.judul, "Pengembangan Media Pembelajaran EVP Learn Berbasis Android untuk Siswa Kelas X SMK"],
+    [f.nama, "AFRIDA DWI RAHMAWATI"],
+    [f.nim, "805230006"],
+    [f.prodi, "Tadris Bahasa Inggris"],
+    [f.fakultas, "Pascasarjana"],
+    [f.universitas, "Universitas Islam Negeri Sulthan Thaha Saifuddin Jambi"],
+    [f.pembimbing, "1. Prof. Dr. Martinis, M.Pd\n2. Tartila, M.Pd, Ed.D"],
+    [f.judul, "The development of Android-based Teaching Materials in English Language Learning for Vocational High Schools"],
     [f.tahun, "2026"],
   ];
   return (
