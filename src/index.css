@@ -334,8 +334,8 @@ h3 { font-size: 16px; font-weight: 600; }
 
 /* ── Splash ───────────────────────────────────────────────────────────────── */
 .splash { min-height: 100vh; background: #1e40af; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; animation: enter .6s ease; }
-.splash-icon { height: 80px; width: 80px; border-radius: 26px; background: rgba(255,255,255,.13); display: grid; place-items: center; margin-bottom: 24px; }
-.splash-icon img { width: 68px; height: 68px; object-fit: contain; border-radius: 18px; }
+.splash-icon { width: 132px; height: 132px; padding: 14px; box-sizing: border-box; border-radius: 30px; background: #fff; display: grid; place-items: center; margin-bottom: 24px; box-shadow: 0 10px 24px rgba(15, 23, 42, .16); }
+.splash-icon img { display: block; width: 100%; height: 100%; object-fit: contain; object-position: center; }
 .splash p { font-size: 10px; letter-spacing: .13em; font-weight: 700; color: #bfdbfe; }
 .splash h1 { font-size: 52px; line-height: .9; margin: 12px 0 14px; }
 .splash span { font-size: 13px; color: #dbeafe; }
